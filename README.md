@@ -5,7 +5,7 @@
 TODO
 * generate appcache
 
-Build web apps targeted for mobile apps using a card-based metaphor. Each
+Build web apps targeted for mobile apps using a card metaphor. Each
 screen is a card. Navigation is done by slide cards horizontally.
 
 Each card is given to carmino as a string of HTML. Carmino will slot the card

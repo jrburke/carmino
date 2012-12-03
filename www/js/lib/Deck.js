@@ -1,6 +1,9 @@
-define(function () {
-  var slice = [].slice.call,
-    tempNode = document.createElement('div');
+define(function (require) {
+  var tempNode = document.createElement('div');
+
+  function slice(aryLike) {
+    return [].slice.call(aryLike, 0);
+  }
 
   function hasClass(node, name) {
     return node.classList.contains(name);
@@ -26,6 +29,33 @@ define(function () {
     return htmlOrNode;
   }
 
+  function parseHref(value) {
+    var parts,
+        result = {},
+        index = value ? value.indexOf('#') : -1;
+
+    if (index !== -1) {
+      value = value.substring(index + 1);
+      index = value.indexOf('?');
+      if (index === -1) {
+        result.target = value;
+      } else {
+        result.target = value.substring(0, index);
+        value = value.substring(index + 1, value);
+        parts = value.split('&');
+        if (parts && parts.length) {
+          result.data = {};
+          parts.forEach(function (part) {
+            part = part.split('=');
+            result.data[decodeURIComponent(part[0])] = decodeURIComponent(part[1]) || true;
+          });
+        }
+      }
+    }
+
+    return result;
+  }
+
   function Deck(node) {
     this.node = node || document.createElement('section');
     this.node.classList.add('deck');
@@ -33,14 +63,16 @@ define(function () {
     this.index = 0;
 
     // Track any cards in the DOM already.
-    slice(0, this.node.children).forEach(function (node) {
+    slice(this.node.children).forEach(function (node) {
       if (hasClass(node, 'card')) {
         this.cards.push(node);
-        if (hasClass('center')) {
+        if (hasClass(node, 'center')) {
           this.index = this.cards.length - 1;
         }
       }
     }.bind(this));
+
+    this._preloadModules();
 
     this.node.addEventListener('transitionend',
                                this._onTransitionEnd.bind(this),
@@ -127,6 +159,8 @@ define(function () {
     },
 
     _onTransitionEnd: function () {
+      var afterTransition, endNode;
+
       // Do not pay attention to events that are not part of this deck.
       if (!this._animating) {
         return;
@@ -150,13 +184,34 @@ define(function () {
           this._deadNodes = [];
         }
 
-        // If an vertical overlay transition was was disabled, if
+        // If a vertical overlay transition was disabled, if
         // current node index is an overlay, enable it again.
-        var endNode = this.cards[this.index];
+        endNode = this.cards[this.index];
         if (endNode.classList.contains('disabled-anim-vertical')) {
           removeClass(endNode, 'disabled-anim-vertical');
           addClass(endNode, 'anim-vertical');
         }
+
+        if (this._afterTransition) {
+          afterTransition = this._afterTransition();
+          delete this._afterTransition;
+          afterTransition();
+        }
+      }
+    },
+
+    _preloadModules: function () {
+      var modules = [];
+      // Scan for next jump points and preload the modules for them.
+      slice(this.cards[this.index].querySelectorAll('[href], [data-href]'))
+        .forEach(function (node) {
+          var link = parseHref(node.href || node.getAttribute('data-href'));
+          if (link.target) {
+            modules.push(link.target);
+          }
+        });
+      if (modules.length) {
+        require(modules);
       }
     },
 
@@ -164,6 +219,7 @@ define(function () {
       node = toCardNode(node, 'before');
       this.node.insertBefore(node, this.cards[0]);
       this.cards.unshift(node);
+      this._afterTransition = this.preloadModules.bind(this);
       this.nav(0);
 
     },
@@ -171,6 +227,7 @@ define(function () {
       node = toCardNode(node, 'after');
       this.node.appendChild(node);
       this.cards.push(node);
+      this._afterTransition = this.preloadModules.bind(this);
       this.nav(this.cards.length - 1);
     }
   };
