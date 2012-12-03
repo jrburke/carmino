@@ -24,7 +24,10 @@ define(function (require) {
       tempNode.innerHTML = '';
     }
 
-    addClass(htmlOrNode, 'card' + (optClass ? ' ' + optClass : ''));
+    addClass(htmlOrNode, 'card');
+    if (optClass) {
+      addClass(htmlOrNode, optClass);
+    }
 
     return htmlOrNode;
   }
@@ -77,6 +80,7 @@ define(function (require) {
     this.node.addEventListener('transitionend',
                                this._onTransitionEnd.bind(this),
                                false);
+    this.node.addEventListener('click', this._onClick.bind(this), false);
   }
 
   Deck.prototype = {
@@ -158,6 +162,24 @@ define(function (require) {
       this.index = cardIndex;
     },
 
+    _onClick: function (evt) {
+      // Another deck claimed this event, so bail.
+      if (evt.deck) {
+        return;
+      }
+
+      var href = evt.target.href || evt.target.getAttribute('data-href'),
+          link = href && parseHref(href);
+
+      if (link && link.target) {
+        require([link.target], function (mod) {
+          mod(this, link.data);
+        }.bind(this));
+
+        evt.deck = true;
+      }
+    },
+
     _onTransitionEnd: function () {
       var afterTransition, endNode;
 
@@ -215,19 +237,28 @@ define(function (require) {
       }
     },
 
+    card: function (title, content) {
+      return '<section class="card"><header>' +
+             title +
+             '</header><div class="content">' +
+             content +
+             '</div></section>';
+    },
+
     before: function (node) {
       node = toCardNode(node, 'before');
       this.node.insertBefore(node, this.cards[0]);
       this.cards.unshift(node);
-      this._afterTransition = this.preloadModules.bind(this);
+      this._afterTransition = this._preloadModules.bind(this);
       this.nav(0);
 
     },
+
     after: function (node) {
       node = toCardNode(node, 'after');
       this.node.appendChild(node);
       this.cards.push(node);
-      this._afterTransition = this.preloadModules.bind(this);
+      this._afterTransition = this._preloadModules.bind(this);
       this.nav(this.cards.length - 1);
     }
   };
