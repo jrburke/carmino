@@ -126,13 +126,15 @@ define(function (require) {
       if (options.immediate) {
         addClass(beginNode, 'no-anim');
         addClass(endNode, 'no-anim');
-
-        // make sure the reflow sees the transition is turned off.
-        temp = this.node.clientWidth;
       } else {
         this._transitionCount = (beginNode && endNode) ? 2 : 1;
         this._animating = true;
       }
+
+      // make sure the reflow sees the correct transition state, whether
+      // it is on or off. Otherwise, forward navigation in Firefox
+      // did not seem to know animation was involved.
+      temp = this.node.clientWidth;
 
       if (this.index === cardIndex) {
         // same node, no transition, just bootstrapping UI.
@@ -233,7 +235,7 @@ define(function (require) {
         }
 
         if (this._afterTransition) {
-          afterTransition = this._afterTransition();
+          afterTransition = this._afterTransition;
           delete this._afterTransition;
           afterTransition();
         }
