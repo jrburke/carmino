@@ -103,6 +103,11 @@ define(function (require) {
         beginNode = null;
       }
 
+      if (cardIndex < this.cards.length - 1) {
+        this._deadNodes = this.cards.splice(cardIndex + 1,
+                                            this.cards.length - cardIndex);
+      }
+
       // If going back and the beginning node was an overlay, do not animate
       // the end node, since it should just be hidden under the overlay.
       if (beginNode && hasClass(beginNode, 'anim-overlay')) {
@@ -162,6 +167,10 @@ define(function (require) {
       this.index = cardIndex;
     },
 
+    back: function () {
+      this.nav(this.index - 1);
+    },
+
     _onClick: function (evt) {
       // Another deck claimed this event, so bail.
       if (evt.deck) {
@@ -169,12 +178,21 @@ define(function (require) {
       }
 
       var href = evt.target.href || evt.target.getAttribute('data-href'),
-          link = href && parseHref(href);
+          link = href && parseHref(href),
+          target = link && link.target;
 
-      if (link && link.target) {
-        require([link.target], function (mod) {
-          mod(this, link.data);
-        }.bind(this));
+      if (target) {
+        if (target.indexOf('!') === 0) {
+          //Deck action, do it and kill the event.
+          target = target.substring(1);
+          this[target](link.data);
+          evt.stopPropagation();
+          evt.preventDefault();
+        } else {
+          require([link.target], function (mod) {
+            mod(this, link.data);
+          }.bind(this));
+        }
 
         evt.deck = true;
       }
@@ -197,7 +215,7 @@ define(function (require) {
       if (this._transitionCount === 0) {
         this._animating = false;
 
-        if (this._deadNodes.length) {
+        if (this._deadNodes) {
           this._deadNodes.forEach(function (domNode) {
             if (domNode.parentNode) {
               domNode.parentNode.removeChild(domNode);
@@ -237,10 +255,17 @@ define(function (require) {
       }
     },
 
-    card: function (title, content) {
+    card: function (title, content, options) {
+      options = options || {};
+
+      var back = options.back || !!options.backTitle,
+          backTitle = options.backTitle || (options.back ? 'Back' : '');
+
       return '<section class="card"><header>' +
+            (back ? '<button data-href="#!back">' + backTitle + '</button>' : '') +
+            '<h1>' +
              title +
-             '</header><div class="content">' +
+             '</h1></header><div class="content">' +
              content +
              '</div></section>';
     },

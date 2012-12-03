@@ -1,13 +1,21 @@
 @import url('lib/carmino.css');
 
 header {
-    height: 4.8em;
-    background: black;
-    color: white;
+  background: -moz-linear-gradient(to top, #ffffff 0, #a3a3a3 5px, #992f21 5px, #992f21 6px, #bb492d 6px, #cc6523 100%);
+  background-image: -webkit-gradient(linear, left top, left bottom, color-stop(0%,  #cc6523), color-stop(100%, #bb492d));
+  height: 5.2rem;
+  width: 100%;
+  padding: 0;
+  padding-bottom: 0.6rem;
+  z-index: 999;
 }
 
-content.yscroll {
-    height: calc(100% - 4.8em);
+header h1 {
+    margin: 0;
+}
+
+.content.yscroll {
+    height: calc(100% - 5.2em);
     overflow-x: hidden;
     overflow-y: auto;
 }
