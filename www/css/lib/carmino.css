@@ -1,0 +1,54 @@
+
+.deck {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+.card {
+  position: absolute;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  -moz-transition-property: transform;
+  -moz-transition-duration: 0.3s;
+  -moz-transition-timing-function: ease;
+  -moz-transition-delay: 0;
+
+}
+
+.card.anim-up center {
+  transition: translateX(0);
+}
+
+.card.no-anim {
+  -moz-transition-property: none;
+}
+
+.card.center {
+  transform: translateX(0);
+}
+
+.card.center.anim-vertical {
+  transform: translateY(0);
+}
+
+.card.before {
+  transform: translateX(-100%);
+}
+
+.card.before.anim-vertical {
+  transform: translateY(100%);
+}
+
+.card.after {
+  transform: translateX(100%);
+}
+
+.card.after.anim-vertical {
+  transform: translateY(-100%);
+}

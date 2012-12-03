@@ -1,0 +1,27 @@
+{
+  "globals": {
+    "define": false,
+    "require": false
+  },
+
+  "browser": true,
+
+  "bitwise": true,
+  "camelcase": true,
+  "curly": true,
+  "eqeqeq": true,
+  "white": true,
+  "forin": true,
+  "immed": true,
+  "indent": 2,
+  "latedef": true,
+  "newcap": true,
+  "noarg": true,
+  "noempty": true,
+  "plusplus": false,
+  "undef": true,
+  "unused": true,
+  "trailing": true,
+  "onevar": true,
+  "white": true
+}

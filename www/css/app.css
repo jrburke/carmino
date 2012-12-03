@@ -1,0 +1,13 @@
+@import url('lib/carmino.css');
+
+header {
+    height: 4.8em;
+    background: black;
+    color: white;
+}
+
+content.yscroll {
+    height: calc(100% - 4.8em);
+    overflow-x: hidden;
+    overflow-y: auto;
+}
