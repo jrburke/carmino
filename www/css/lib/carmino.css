@@ -14,41 +14,53 @@
   width: 100%;
   height: 100%;
   overflow: hidden;
-  -moz-transition-property: transform;
-  -moz-transition-duration: 0.3s;
-  -moz-transition-timing-function: ease;
-  -moz-transition-delay: 0;
-
+  -webkit-transition-property: transform;
+  -webkit-transition-duration: 0.3s;
+  -webkit-transition-timing-function: ease;
+  -webkit-transition-delay: 0;
+  transition-property: transform;
+  transition-duration: 0.3s;
+  transition-timing-function: ease;
+  transition-delay: 0;
 }
 
 .card.anim-up center {
+  -webkit-transition: translateX(0);
   transition: translateX(0);
 }
 
 .card.no-anim {
   -moz-transition-property: none;
+  -webkit-transition-property: none;
+  transition-property: none;
 }
 
 .card.center {
+  -webkit-transform: translateX(0);
   transform: translateX(0);
 }
 
 .card.center.anim-vertical {
-  transform: translateY(0);
+  -webkit-transform: translateX(0);
+  transform: translateX(0);
 }
 
 .card.before {
+  -webkit-transform: translateX(-100%);
   transform: translateX(-100%);
 }
 
 .card.before.anim-vertical {
+  -webkit-transform: translateY(100%);
   transform: translateY(100%);
 }
 
 .card.after {
+  -webkit-transform: translateX(100%);
   transform: translateX(100%);
 }
 
 .card.after.anim-vertical {
+  -webkit-transform: translateY(-100%);
   transform: translateY(-100%);
 }

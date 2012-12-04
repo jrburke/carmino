@@ -65,6 +65,7 @@ define(function (require) {
     slice(this.node.children).forEach(function (node) {
       var oldCardId = node.getAttribute('data-cardid');
       if (oldCardId) {
+        oldCardId = parseInt(oldCardId, 10);
         // Rehydrated. Up internal ID to be past this ID.
         if (this.cardIdCounter < oldCardId) {
           this.cardIdCounter = oldCardId + 1;
@@ -95,12 +96,29 @@ define(function (require) {
   }
 
   Deck.init = function (moduleId) {
-    var deck = new Deck();
-    document.body.appendChild(deck.node);
-    require([moduleId], function (init) {
-      init(deck);
-      deck._preloadModules();
-    });
+    // read existing state to know if it needs to be hydrated.
+    var docNode, deck,
+        state = history.state;
+
+    if (state && state.html) {
+      document.body.innerHTML = state.html;
+
+      // Create the deck
+      docNode = document.querySelector('body > .deck');
+      if (docNode) {
+        deck = new Deck(docNode);
+      }
+    }
+
+    if (!docNode) {
+      document.body.innerHTML = '';
+      deck = new Deck();
+      document.body.appendChild(deck.node);
+      require([moduleId], function (init) {
+        init(deck);
+        deck._preloadModules();
+      });
+    }
   };
 
   Deck.prototype = {
@@ -161,7 +179,8 @@ define(function (require) {
 
       history.replaceState({
         deckId: this.id,
-        cardId: node.getAttribute('data-cardid')
+        cardId: parseInt(node.getAttribute('data-cardid'), 10),
+        html: document.body.innerHTML
       }, title);
     },
 
@@ -291,6 +310,8 @@ define(function (require) {
       var link,
           index = -1,
           state = evt.state;
+
+console.log('popstate', state);
 
       // Ignore states targeted for other decks, or a non-deck history stop.
       if (!state || !state.deckId || this.id !== state.deckId) {
