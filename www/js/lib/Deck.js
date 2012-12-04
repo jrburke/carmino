@@ -59,9 +59,17 @@ define(function (require) {
     this.cardIdCounter = 0;
     this.index = 0;
 
+    this.node.setAttribute('data-deckid', this.id);
+
     // Track any cards in the DOM already.
     slice(this.node.children).forEach(function (node) {
-      if (!node.getAttribute('data-cardid')) {
+      var oldCardId = node.getAttribute('data-cardid');
+      if (oldCardId) {
+        // Rehydrated. Up internal ID to be past this ID.
+        if (this.cardIdCounter < oldCardId) {
+          this.cardIdCounter = oldCardId + 1;
+        }
+      } else {
         node.setAttribute('data-cardid', this.cardIdCounter += 1);
       }
 
@@ -85,6 +93,15 @@ define(function (require) {
     addEvent(this.node, 'click', this, '_onClick');
     addEvent(window, 'popstate', this, '_onPopState');
   }
+
+  Deck.init = function (moduleId) {
+    var deck = new Deck();
+    document.body.appendChild(deck.node);
+    require([moduleId], function (init) {
+      init(deck);
+      deck._preloadModules();
+    });
+  };
 
   Deck.prototype = {
     card: function (title, content, options) {
@@ -118,22 +135,24 @@ define(function (require) {
       return htmlOrNode;
     },
 
-    before: function (node) {
-      node = this.toCardNode(node, 'before');
+    before: function (node, options) {
+      options = options || {};
+      node = this.toCardNode(node, options.immediate ? 'center' : 'before');
       this.node.insertBefore(node, this.cards[0]);
       this.cards.unshift(node);
       this._afterTransition = this._preloadModules.bind(this);
       this.setHistoryState(node);
-      this.nav(0);
+      this.nav(0, options);
     },
 
-    after: function (node) {
-      node = this.toCardNode(node, 'after');
+    after: function (node, options) {
+      options = options || {};
+      node = this.toCardNode(node, options.immediate ? 'center' : 'after');
       this.node.appendChild(node);
       this.cards.push(node);
       this._afterTransition = this._preloadModules.bind(this);
       this.setHistoryState(node);
-      this.nav(this.cards.length - 1);
+      this.nav(this.cards.length - 1, options);
     },
 
     setHistoryState: function (node) {
@@ -235,6 +254,14 @@ define(function (require) {
       history.back();
     },
 
+    _navLink: function (link) {
+      if (link.target) {
+        require([link.target], function (mod) {
+          mod(this, link.data);
+        }.bind(this));
+      }
+    },
+
     _onClick: function (evt) {
       // Another deck claimed this event, so bail.
       if (evt.deck) {
@@ -253,9 +280,7 @@ define(function (require) {
           evt.stopPropagation();
           evt.preventDefault();
         } else {
-          require([link.target], function (mod) {
-            mod(this, link.data);
-          }.bind(this));
+          this._navLink(link);
         }
 
         evt.deck = true;
@@ -263,7 +288,8 @@ define(function (require) {
     },
 
     _onPopState: function (evt) {
-      var index = -1,
+      var link,
+          index = -1,
           state = evt.state;
 
       // Ignore states targeted for other decks, or a non-deck history stop.
@@ -281,6 +307,10 @@ define(function (require) {
 
       if (index !== -1) {
         this.nav(index);
+      } else {
+        // A forward action in the browser. Nav to a new card.
+        link = parseHref(location.href);
+        this._navLink(link);
       }
     },
 
@@ -327,9 +357,15 @@ define(function (require) {
     },
 
     _preloadModules: function () {
-      var modules = [];
+      var modules = [],
+          node = this.cards[this.index];
+
+      if (!node) {
+        return;
+      }
+
       // Scan for next jump points and preload the modules for them.
-      slice(this.cards[this.index].querySelectorAll('[href], [data-href]'))
+      slice(node.querySelectorAll('[href], [data-href]'))
         .forEach(function (node) {
           var link = parseHref(node.href || node.getAttribute('data-href'));
           if (link.target && link.target.charAt(0) !== '!') {
