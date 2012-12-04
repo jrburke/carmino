@@ -50,8 +50,6 @@ define(function (require) {
   }
 
   function Deck(node) {
-    var currentNode;
-
     this.id = deckId += 1;
     this.node = node || document.createElement('section');
     this.node.classList.add('deck');
@@ -83,9 +81,8 @@ define(function (require) {
     }.bind(this));
 
     // Set history state for current card, if there is one.
-    currentNode = this.cards[this.index];
-    if (currentNode) {
-      this.setHistoryState(currentNode);
+    if (this.cards[this.index]) {
+      this.setHistoryState();
     }
 
     this._preloadModules();
@@ -97,23 +94,29 @@ define(function (require) {
 
   Deck.init = function (moduleId) {
     // read existing state to know if it needs to be hydrated.
-    var deck,
-        link = parseHref(location.href);
+    var docNode, deck,
+        state = history.state;
 
-    // If have a target, this was a reload, reset to the beginning.
-    if (link && link.target) {
-      location.replace('#');
-      location.reload();
-      return;
+    if (state && state.html) {
+      document.body.innerHTML = state.html;
+
+      // Create the deck
+      docNode = document.querySelector('body > .deck');
+      if (docNode) {
+        deck = new Deck(docNode);
+      }
     }
 
-    document.body.innerHTML = '';
-    deck = new Deck();
-    document.body.appendChild(deck.node);
-    require([moduleId], function (init) {
-      init(deck);
-      deck._preloadModules();
-    });
+    if (!docNode) {
+      document.body.innerHTML = '';
+      deck = new Deck();
+      document.body.appendChild(deck.node);
+      require([moduleId], function (init) {
+        init(deck);
+        deck.setHistoryState();
+        deck._preloadModules();
+      });
+    }
   };
 
   Deck.prototype = {
@@ -154,7 +157,6 @@ define(function (require) {
       this.node.insertBefore(node, this.cards[0]);
       this.cards.unshift(node);
       this._afterTransition = this._preloadModules.bind(this);
-      this.setHistoryState(node);
       this.nav(0, options);
     },
 
@@ -164,12 +166,12 @@ define(function (require) {
       this.node.appendChild(node);
       this.cards.push(node);
       this._afterTransition = this._preloadModules.bind(this);
-      this.setHistoryState(node);
       this.nav(this.cards.length - 1, options);
     },
 
-    setHistoryState: function (node) {
-      var title = node.querySelector('h1');
+    setHistoryState: function () {
+      var node = this.cards[this.index],
+          title = node.querySelector('h1');
       title = (title && title.innerText) || '';
 
       history.replaceState({
@@ -262,6 +264,7 @@ define(function (require) {
       }
 
       this.index = cardIndex;
+      this.setHistoryState();
     },
 
     back: function () {
