@@ -1,21 +1,18 @@
-@import url('lib/carmino.css');
+@import url('../../lib/shared/style/action_menu.css');
+@import url('../../lib/shared/style/buttons.css');
+@import url('../../lib/shared/style/confirm.css');
+@import url('../../lib/shared/style/edit_mode.css');
+@import url('../../lib/shared/style/headers.css');
+@import url('../../lib/shared/style/input_areas.css');
+@import url('../../lib/shared/style/status.css');
+@import url('../../lib/shared/style/switches.css');
 
-header {
-  background: -moz-linear-gradient(to top, #ffffff 0, #a3a3a3 5px, #992f21 5px, #992f21 6px, #bb492d 6px, #cc6523 100%);
-  background-image: -webkit-gradient(linear, left top, left bottom, color-stop(0%,  #cc6523), color-stop(100%, #bb492d));
-  height: 5.2rem;
-  width: 100%;
-  padding: 0;
-  padding-bottom: 0.6rem;
-  z-index: 999;
+@import url('../../lib/carmino.css');
+
+html {
+  font-family: 'MozTT',sans-serif;
 }
 
-header h1 {
-    margin: 0;
-}
-
-.content.yscroll {
-    height: calc(100% - 5.2em);
-    overflow-x: hidden;
-    overflow-y: auto;
+div.content {
+  padding: 0 1em;
 }

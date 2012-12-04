@@ -97,6 +97,8 @@ define(function (require) {
     var docNode, deck,
         state = history.state;
 
+    document.body.setAttribute('role', 'application');
+
     if (state && state.html) {
       document.body.innerHTML = state.html;
 
@@ -123,11 +125,8 @@ define(function (require) {
     card: function (title, content, options) {
       options = options || {};
 
-      var back = options.back || !!options.backTitle,
-          backTitle = options.backTitle || (options.back ? 'Back' : '');
-
-      return '<section class="card"><header>' +
-            (back ? '<button data-href="#!back">' + backTitle + '</button>' : '') +
+      return '<section class="card" role="region"><header>' +
+            (options.back ? '<a data-href="#!back"><span class="icon icon-back"></span></a>' : '') +
             '<h1>' +
              title +
              '</h1></header><div class="content">' +

@@ -64,3 +64,9 @@
   -webkit-transform: translateY(-100%);
   transform: translateY(-100%);
 }
+
+/* Some overrides for some choices made
+to get the shared styles to show up */
+.card header a span {
+  pointer-events: none;
+}
