@@ -1,10 +1,7 @@
-define(function (require) {
-
-    function appNext(deck, data) {
-        deck.after(deck.card('THIS IS NEXT', 'some other content', {
-            backTitle: 'Main'
-        }));
-    }
-
-    return appNext;
+define(function () {
+  return function appNext(deck, data) {
+    deck.after(deck.card('THIS IS NEXT', 'some other content. <a href="#app/another">Go another</a>.', {
+      backTitle: 'Main'
+    }));
+  };
 });

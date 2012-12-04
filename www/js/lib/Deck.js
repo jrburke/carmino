@@ -1,5 +1,6 @@
 define(function (require) {
-  var tempNode = document.createElement('div');
+  var tempNode = document.createElement('div'),
+      deckId = 0;
 
   function slice(aryLike) {
     return [].slice.call(aryLike, 0);
@@ -17,19 +18,8 @@ define(function (require) {
     return node && node.classList.remove(name);
   }
 
-  function toCardNode(htmlOrNode, optClass) {
-    if (typeof htmlOrNode === 'string') {
-      tempNode.innerHTML = htmlOrNode;
-      htmlOrNode = tempNode.children[0];
-      tempNode.innerHTML = '';
-    }
-
-    addClass(htmlOrNode, 'card');
-    if (optClass) {
-      addClass(htmlOrNode, optClass);
-    }
-
-    return htmlOrNode;
+  function addEvent(targetNode, evtName, deck, prop) {
+    targetNode.addEventListener(evtName, deck[prop].bind(deck), false);
   }
 
   function parseHref(value) {
@@ -60,13 +50,21 @@ define(function (require) {
   }
 
   function Deck(node) {
+    var currentNode;
+
+    this.id = deckId += 1;
     this.node = node || document.createElement('section');
     this.node.classList.add('deck');
     this.cards = [];
+    this.cardIdCounter = 0;
     this.index = 0;
 
     // Track any cards in the DOM already.
     slice(this.node.children).forEach(function (node) {
+      if (!node.getAttribute('data-cardid')) {
+        node.setAttribute('data-cardid', this.cardIdCounter += 1);
+      }
+
       if (hasClass(node, 'card')) {
         this.cards.push(node);
         if (hasClass(node, 'center')) {
@@ -75,15 +73,79 @@ define(function (require) {
       }
     }.bind(this));
 
+    // Set history state for current card, if there is one.
+    currentNode = this.cards[this.index];
+    if (currentNode) {
+      this.setHistoryState(currentNode);
+    }
+
     this._preloadModules();
 
-    this.node.addEventListener('transitionend',
-                               this._onTransitionEnd.bind(this),
-                               false);
-    this.node.addEventListener('click', this._onClick.bind(this), false);
+    addEvent(this.node, 'transitionend', this, '_onTransitionEnd');
+    addEvent(this.node, 'click', this, '_onClick');
+    addEvent(window, 'popstate', this, '_onPopState');
   }
 
   Deck.prototype = {
+    card: function (title, content, options) {
+      options = options || {};
+
+      var back = options.back || !!options.backTitle,
+          backTitle = options.backTitle || (options.back ? 'Back' : '');
+
+      return '<section class="card"><header>' +
+            (back ? '<button data-href="#!back">' + backTitle + '</button>' : '') +
+            '<h1>' +
+             title +
+             '</h1></header><div class="content">' +
+             content +
+             '</div></section>';
+    },
+
+    toCardNode: function (htmlOrNode, optClass) {
+      if (typeof htmlOrNode === 'string') {
+        tempNode.innerHTML = htmlOrNode;
+        htmlOrNode = tempNode.children[0];
+        tempNode.innerHTML = '';
+      }
+
+      htmlOrNode.setAttribute('data-cardid', (this.cardIdCounter += 1));
+      addClass(htmlOrNode, 'card');
+      if (optClass) {
+        addClass(htmlOrNode, optClass);
+      }
+
+      return htmlOrNode;
+    },
+
+    before: function (node) {
+      node = this.toCardNode(node, 'before');
+      this.node.insertBefore(node, this.cards[0]);
+      this.cards.unshift(node);
+      this._afterTransition = this._preloadModules.bind(this);
+      this.setHistoryState(node);
+      this.nav(0);
+    },
+
+    after: function (node) {
+      node = this.toCardNode(node, 'after');
+      this.node.appendChild(node);
+      this.cards.push(node);
+      this._afterTransition = this._preloadModules.bind(this);
+      this.setHistoryState(node);
+      this.nav(this.cards.length - 1);
+    },
+
+    setHistoryState: function (node) {
+      var title = node.querySelector('h1');
+      title = (title && title.innerText) || '';
+
+      history.replaceState({
+        deckId: this.id,
+        cardId: node.getAttribute('data-cardid')
+      }, title);
+    },
+
     nav: function (cardIndex, options) {
       options = options || {};
 
@@ -170,7 +232,7 @@ define(function (require) {
     },
 
     back: function () {
-      this.nav(this.index - 1);
+      history.back();
     },
 
     _onClick: function (evt) {
@@ -197,6 +259,28 @@ define(function (require) {
         }
 
         evt.deck = true;
+      }
+    },
+
+    _onPopState: function (evt) {
+      var index = -1,
+          state = evt.state;
+
+      // Ignore states targeted for other decks, or a non-deck history stop.
+      if (!state || !state.deckId || this.id !== state.deckId) {
+        return;
+      }
+
+      // Find the card that should be shown
+      this.cards.some(function (node, i) {
+        if (node.getAttribute('data-cardid') === state.cardId) {
+          index = i;
+          return true;
+        }
+      });
+
+      if (index !== -1) {
+        this.nav(index);
       }
     },
 
@@ -248,45 +332,13 @@ define(function (require) {
       slice(this.cards[this.index].querySelectorAll('[href], [data-href]'))
         .forEach(function (node) {
           var link = parseHref(node.href || node.getAttribute('data-href'));
-          if (link.target) {
+          if (link.target && link.target.charAt(0) !== '!') {
             modules.push(link.target);
           }
         });
       if (modules.length) {
         require(modules);
       }
-    },
-
-    card: function (title, content, options) {
-      options = options || {};
-
-      var back = options.back || !!options.backTitle,
-          backTitle = options.backTitle || (options.back ? 'Back' : '');
-
-      return '<section class="card"><header>' +
-            (back ? '<button data-href="#!back">' + backTitle + '</button>' : '') +
-            '<h1>' +
-             title +
-             '</h1></header><div class="content">' +
-             content +
-             '</div></section>';
-    },
-
-    before: function (node) {
-      node = toCardNode(node, 'before');
-      this.node.insertBefore(node, this.cards[0]);
-      this.cards.unshift(node);
-      this._afterTransition = this._preloadModules.bind(this);
-      this.nav(0);
-
-    },
-
-    after: function (node) {
-      node = toCardNode(node, 'after');
-      this.node.appendChild(node);
-      this.cards.push(node);
-      this._afterTransition = this._preloadModules.bind(this);
-      this.nav(this.cards.length - 1);
     }
   };
 
