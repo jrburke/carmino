@@ -97,28 +97,23 @@ define(function (require) {
 
   Deck.init = function (moduleId) {
     // read existing state to know if it needs to be hydrated.
-    var docNode, deck,
-        state = history.state;
+    var deck,
+        link = parseHref(location.href);
 
-    if (state && state.html) {
-      document.body.innerHTML = state.html;
-
-      // Create the deck
-      docNode = document.querySelector('body > .deck');
-      if (docNode) {
-        deck = new Deck(docNode);
-      }
+    // If have a target, this was a reload, reset to the beginning.
+    if (link && link.target) {
+      location.replace('#');
+      location.reload();
+      return;
     }
 
-    if (!docNode) {
-      document.body.innerHTML = '';
-      deck = new Deck();
-      document.body.appendChild(deck.node);
-      require([moduleId], function (init) {
-        init(deck);
-        deck._preloadModules();
-      });
-    }
+    document.body.innerHTML = '';
+    deck = new Deck();
+    document.body.appendChild(deck.node);
+    require([moduleId], function (init) {
+      init(deck);
+      deck._preloadModules();
+    });
   };
 
   Deck.prototype = {
@@ -320,7 +315,7 @@ console.log('popstate', state);
 
       // Find the card that should be shown
       this.cards.some(function (node, i) {
-        if (node.getAttribute('data-cardid') === state.cardId) {
+        if (parseInt(node.getAttribute('data-cardid'), 10) === state.cardId) {
           index = i;
           return true;
         }
