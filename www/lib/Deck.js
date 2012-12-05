@@ -35,7 +35,12 @@ define(function (require, exports, module) {
   }
 
   function addEvent(targetNode, evtName, deck, prop) {
-    targetNode.addEventListener(evtName, deck[prop].bind(deck), false);
+    var fn = deck[prop].bind(deck);
+    deck.handlers[evtName] = {
+      node: targetNode,
+      fn: fn
+    };
+    targetNode.addEventListener(evtName, fn, false);
   }
 
   function stopEvent(evt) {
@@ -71,11 +76,14 @@ define(function (require, exports, module) {
     return result;
   }
 
-  function Deck(node) {
+  function Deck(node, options) {
+    options = options || {};
+
     this.id = deckId += 1;
     this.node = node || document.createElement('section');
     this.node.classList.add('deck');
     this.cards = [];
+    this.handlers = {};
     this.cardIdCounter = 0;
     this.index = 0;
 
@@ -107,7 +115,9 @@ define(function (require, exports, module) {
       this.saveState();
     }
 
-    this._preloadModules();
+    if (!options.skipPreload) {
+      this._preloadModules();
+    }
 
     addEvent(this.node, 'transitionend', this, '_onTransitionEnd');
     addEvent(this.node, 'click', this, '_onClick');
@@ -125,7 +135,7 @@ define(function (require, exports, module) {
       document.body.appendChild(deck.node);
       require([moduleId], function (init) {
         prim().start(function () {
-          return init(deck.makeLocalDeck());
+          return init(deck.makeLocalDeck('', moduleId));
         }).then(function () {
           deck.saveState();
           deck._preloadModules();
@@ -138,11 +148,17 @@ define(function (require, exports, module) {
   };
 
   Deck.prototype = {
+    destroy: function () {
+      Object.keys(this.handlers).forEach(function (evtName) {
+        var obj = this.handlers[evtName];
+        obj.node.removeEventListener(evtName, obj.fn, false);
+      });
+    },
+
     card: function (title, content, options) {
       options = options || {};
 
-      return '<section class="card" role="region"  data-moduleid="' +
-            (options.id || '') + '"><header>' +
+      return '<section class="card" role="region"><header>' +
             (options.back ? '<a data-href="#!back"><span class="icon icon-back"></span></a>' : '') +
             '<h1>' +
              title +
@@ -151,7 +167,7 @@ define(function (require, exports, module) {
              '</div></section>';
     },
 
-    toCardNode: function (htmlOrNode, href, optClass) {
+    toCardNode: function (htmlOrNode, href, moduleId, optClass) {
       if (typeof htmlOrNode === 'string') {
         tempNode.innerHTML = htmlOrNode;
         htmlOrNode = tempNode.children[0];
@@ -159,6 +175,7 @@ define(function (require, exports, module) {
       }
 
       htmlOrNode.setAttribute('data-cardid', (this.cardIdCounter += 1));
+      htmlOrNode.setAttribute('data-moduleid', moduleId || '');
       htmlOrNode.setAttribute('data-location', href || '');
 
       addClass(htmlOrNode, 'card');
@@ -169,18 +186,18 @@ define(function (require, exports, module) {
       return htmlOrNode;
     },
 
-    before: function (href, node, options) {
+    before: function (href, moduleId, node, options) {
       options = options || {};
-      node = this.toCardNode(node, href, options.immediate ? 'center' : 'before');
+      node = this.toCardNode(node, href, moduleId, options.immediate ? 'center' : 'before');
       this.node.insertBefore(node, this.cards[0]);
       this.cards.unshift(node);
       this._afterTransition = this._preloadModules.bind(this);
       this.nav(0, options);
     },
 
-    after: function (href, node, options) {
+    after: function (href, moduleId, node, options) {
       options = options || {};
-      node = this.toCardNode(node, href, options.immediate ? 'center' : 'after');
+      node = this.toCardNode(node, href, moduleId, options.immediate ? 'center' : 'after');
       this.node.appendChild(node);
       this.cards.push(node);
       this._afterTransition = this._preloadModules.bind(this);
@@ -290,18 +307,18 @@ define(function (require, exports, module) {
       this.nav(this.index - 1);
     },
 
-    makeLocalDeck: function (href) {
+    makeLocalDeck: function (href, moduleId) {
       return {
         card: this.card.bind(this),
-        before: this.before.bind(this, href),
-        after: this.after.bind(this, href)
+        before: this.before.bind(this, href, moduleId),
+        after: this.after.bind(this, href, moduleId)
       };
     },
 
     _navLink: function (link) {
       if (link.target) {
         require([link.target], function (mod) {
-          mod(this.makeLocalDeck(link.href), link.data);
+          mod(this.makeLocalDeck(link.href, link.target), link.data);
         }.bind(this));
       }
     },
@@ -372,9 +389,10 @@ define(function (require, exports, module) {
       }
     },
 
-    _preloadModules: function () {
-      var modules = [],
-          node = this.cards[this.index];
+    _preloadModules: function (node) {
+      var modules = [];
+
+      node = node || this.cards[this.index];
 
       if (!node) {
         return;
@@ -405,7 +423,11 @@ define(function (require, exports, module) {
     document.body.innerHTML = html;
     deckNode = document.querySelector('body > .deck');
     if (deckNode) {
-      tempDeck = new Deck(deckNode);
+      tempDeck = new Deck(deckNode, {
+        skipPreload: true
+      });
+      //Scan for all modules used.
+      tempDeck._preloadModules(deckNode);
       tempDeck = null;
     }
     html = null;
