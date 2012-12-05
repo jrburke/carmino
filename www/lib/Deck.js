@@ -1,17 +1,16 @@
 define(function (require, exports, module) {
-  var prim = require('prim'),
+  var tempDeck, html, deckNode,
+      prim = require('prim'),
       tempNode = document.createElement('div'),
       version = '1',
       storageVersionId = module.id + '-version',
       storageHtmlId = module.id + '-html',
-      storageHrefId = module.id + '-href',
       storedVersion = localStorage.getItem(storageVersionId),
       deckId = 0;
 
   function reset() {
     localStorage.setItem(storageVersionId, version);
-    localStorage.setItem(storageHtmlId, '');
-    localStorage.setItem(storageHrefId, '');
+    localStorage.removeItem(storageHtmlId);
   }
 
   // If version does not match this version of Deck, then reset.
@@ -37,6 +36,11 @@ define(function (require, exports, module) {
 
   function addEvent(targetNode, evtName, deck, prop) {
     targetNode.addEventListener(evtName, deck[prop].bind(deck), false);
+  }
+
+  function stopEvent(evt) {
+    evt.stopPropagation();
+    evt.preventDefault();
   }
 
   function parseHref(value) {
@@ -114,34 +118,10 @@ define(function (require, exports, module) {
   Deck.reset = reset;
 
   Deck.init = function (moduleId) {
-    // read existing state to know if it needs to be hydrated.
-    var docNode, deck,
-        link = parseHref(location.href),
-        href = localStorage.getItem(storageHrefId),
-        html = localStorage.getItem(storageHtmlId);
-
-    document.body.setAttribute('role', 'application');
-
-    if (html) {
-      if (href === link.href || (!href && !link.href)) {
-        document.body.innerHTML = html;
-
-        // Create the deck
-        docNode = document.querySelector('body > .deck');
-        if (docNode) {
-          deck = new Deck(docNode);
-        }
-      } else {
-        //Bad state/cache, reset.
-        reset();
-        location.replace('#');
-        location.reload();
-      }
-    }
-
-    if (!docNode) {
-      document.body.innerHTML = '';
-      deck = new Deck();
+    // If no deckNode from initial hydration (done at end of this file)
+    // then init a new deck.
+    if (!deckNode) {
+      var deck = new Deck();
       document.body.appendChild(deck.node);
       require([moduleId], function (init) {
         prim().start(function () {
@@ -152,6 +132,9 @@ define(function (require, exports, module) {
         });
       });
     }
+
+    //Clear docNode, no longer need it
+    deckNode = null;
   };
 
   Deck.prototype = {
@@ -208,11 +191,11 @@ define(function (require, exports, module) {
       var node = this.cards[this.index],
           href = node.getAttribute('data-location') || '';
 
+      location.replace('#' + href);
+
       // Do not block anything going on in the UI, wait until after
       // the animation is probably done.
       setTimeout(function () {
-        location.replace('#' + href);
-        localStorage.setItem(storageHrefId, href);
         localStorage.setItem(storageHtmlId, document.body.innerHTML);
       }, 500);
     },
@@ -324,6 +307,12 @@ define(function (require, exports, module) {
     },
 
     _onClick: function (evt) {
+      if (this._animating) {
+        // Just kill the event, wait until animation is done to do new clicks.
+        stopEvent(evt);
+        return;
+      }
+
       var href = evt.target.href || evt.target.getAttribute('data-href'),
           link = href && parseHref(href),
           target = link && link.target;
@@ -337,8 +326,7 @@ define(function (require, exports, module) {
           this._navLink(link);
         }
 
-        evt.stopPropagation();
-        evt.preventDefault();
+        stopEvent(evt);
       }
     },
 
@@ -407,6 +395,21 @@ define(function (require, exports, module) {
       }
     }
   };
+
+  // Read existing state to know if it needs to be hydrated. Do this here
+  // as part of module initialization to get the fastest inject before waiting
+  // for all app code.
+  document.body.setAttribute('role', 'application');
+  html = localStorage.getItem(storageHtmlId);
+  if (html) {
+    document.body.innerHTML = html;
+    deckNode = document.querySelector('body > .deck');
+    if (deckNode) {
+      tempDeck = new Deck(deckNode);
+      tempDeck = null;
+    }
+    html = null;
+  }
 
   return Deck;
 });
