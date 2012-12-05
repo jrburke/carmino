@@ -1,6 +1,22 @@
-define(function (require) {
+define(function (require, exports, module) {
   var tempNode = document.createElement('div'),
+      version = '1',
+      storageVersionId = module.id + '-version',
+      storageHtmlId = module.id + '-html',
+      storageHrefId = module.id + '-href',
+      storedVersion = localStorage.getItem(storageVersionId),
       deckId = 0;
+
+  function reset() {
+    localStorage.setItem(storageVersionId, version);
+    localStorage.setItem(storageHtmlId, '');
+    localStorage.setItem(storageHrefId, '');
+  }
+
+  // If version does not match this version of Deck, then reset.
+  if (storedVersion !== version) {
+    reset();
+  }
 
   function slice(aryLike) {
     return [].slice.call(aryLike, 0);
@@ -29,6 +45,7 @@ define(function (require) {
 
     if (index !== -1) {
       value = value.substring(index + 1);
+      result.href = value;
       index = value.indexOf('?');
       if (index === -1) {
         result.target = value;
@@ -82,30 +99,38 @@ define(function (require) {
 
     // Set history state for current card, if there is one.
     if (this.cards[this.index]) {
-      this.setHistoryState();
+      this.saveState();
     }
 
     this._preloadModules();
 
     addEvent(this.node, 'transitionend', this, '_onTransitionEnd');
     addEvent(this.node, 'click', this, '_onClick');
-    addEvent(window, 'popstate', this, '_onPopState');
   }
 
   Deck.init = function (moduleId) {
     // read existing state to know if it needs to be hydrated.
     var docNode, deck,
-        state = history.state;
+        link = parseHref(location.href),
+        href = localStorage.getItem(storageHrefId),
+        html = localStorage.getItem(storageHtmlId);
 
     document.body.setAttribute('role', 'application');
 
-    if (state && state.html) {
-      document.body.innerHTML = state.html;
+    if (html) {
+      if (href === link.href || (!href && !link.href)) {
+        document.body.innerHTML = html;
 
-      // Create the deck
-      docNode = document.querySelector('body > .deck');
-      if (docNode) {
-        deck = new Deck(docNode);
+        // Create the deck
+        docNode = document.querySelector('body > .deck');
+        if (docNode) {
+          deck = new Deck(docNode);
+        }
+      } else {
+        //Bad state/cache, reset.
+        reset();
+        location.replace('#');
+        location.reload();
       }
     }
 
@@ -114,8 +139,8 @@ define(function (require) {
       deck = new Deck();
       document.body.appendChild(deck.node);
       require([moduleId], function (init) {
-        init(deck);
-        deck.setHistoryState();
+        init(deck.makeLocalDeck());
+        deck.saveState();
         deck._preloadModules();
       });
     }
@@ -125,7 +150,8 @@ define(function (require) {
     card: function (title, content, options) {
       options = options || {};
 
-      return '<section class="card" role="region"><header>' +
+      return '<section class="card" role="region"  data-moduleid="' +
+            (options.id || '') + '"><header>' +
             (options.back ? '<a data-href="#!back"><span class="icon icon-back"></span></a>' : '') +
             '<h1>' +
              title +
@@ -134,7 +160,7 @@ define(function (require) {
              '</div></section>';
     },
 
-    toCardNode: function (htmlOrNode, optClass) {
+    toCardNode: function (htmlOrNode, href, optClass) {
       if (typeof htmlOrNode === 'string') {
         tempNode.innerHTML = htmlOrNode;
         htmlOrNode = tempNode.children[0];
@@ -142,6 +168,8 @@ define(function (require) {
       }
 
       htmlOrNode.setAttribute('data-cardid', (this.cardIdCounter += 1));
+      htmlOrNode.setAttribute('data-location', href || '');
+
       addClass(htmlOrNode, 'card');
       if (optClass) {
         addClass(htmlOrNode, optClass);
@@ -150,34 +178,35 @@ define(function (require) {
       return htmlOrNode;
     },
 
-    before: function (node, options) {
+    before: function (href, node, options) {
       options = options || {};
-      node = this.toCardNode(node, options.immediate ? 'center' : 'before');
+      node = this.toCardNode(node, href, options.immediate ? 'center' : 'before');
       this.node.insertBefore(node, this.cards[0]);
       this.cards.unshift(node);
       this._afterTransition = this._preloadModules.bind(this);
       this.nav(0, options);
     },
 
-    after: function (node, options) {
+    after: function (href, node, options) {
       options = options || {};
-      node = this.toCardNode(node, options.immediate ? 'center' : 'after');
+      node = this.toCardNode(node, href, options.immediate ? 'center' : 'after');
       this.node.appendChild(node);
       this.cards.push(node);
       this._afterTransition = this._preloadModules.bind(this);
       this.nav(this.cards.length - 1, options);
     },
 
-    setHistoryState: function () {
+    saveState: function () {
       var node = this.cards[this.index],
-          title = node.querySelector('h1');
-      title = (title && title.innerText) || '';
+          href = node.getAttribute('data-location') || '';
 
-      history.replaceState({
-        deckId: this.id,
-        cardId: parseInt(node.getAttribute('data-cardid'), 10),
-        html: document.body.innerHTML
-      }, title);
+      // Do not block anything going on in the UI, wait until after
+      // the animation is probably done.
+      setTimeout(function () {
+        location.replace('#' + href);
+        localStorage.setItem(storageHrefId, href);
+        localStorage.setItem(storageHtmlId, document.body.innerHTML);
+      }, 500);
     },
 
     nav: function (cardIndex, options) {
@@ -263,72 +292,45 @@ define(function (require) {
       }
 
       this.index = cardIndex;
-      this.setHistoryState();
+      this.saveState();
     },
 
     back: function () {
-      history.back();
+      this.nav(this.index - 1);
+    },
+
+    makeLocalDeck: function (href) {
+      return {
+        card: this.card.bind(this),
+        before: this.before.bind(this, href),
+        after: this.after.bind(this, href)
+      };
     },
 
     _navLink: function (link) {
       if (link.target) {
         require([link.target], function (mod) {
-          mod(this, link.data);
+          mod(this.makeLocalDeck(link.href), link.data);
         }.bind(this));
       }
     },
 
     _onClick: function (evt) {
-      // Another deck claimed this event, so bail.
-      if (evt.deck) {
-        return;
-      }
-
       var href = evt.target.href || evt.target.getAttribute('data-href'),
           link = href && parseHref(href),
           target = link && link.target;
 
       if (target) {
         if (target.indexOf('!') === 0) {
-          //Deck action, do it and kill the event.
+          //Deck action
           target = target.substring(1);
           this[target](link.data);
-          evt.stopPropagation();
-          evt.preventDefault();
         } else {
           this._navLink(link);
         }
 
-        evt.deck = true;
-      }
-    },
-
-    _onPopState: function (evt) {
-      var link,
-          index = -1,
-          state = evt.state;
-
-console.log('popstate', state);
-
-      // Ignore states targeted for other decks, or a non-deck history stop.
-      if (!state || !state.deckId || this.id !== state.deckId) {
-        return;
-      }
-
-      // Find the card that should be shown
-      this.cards.some(function (node, i) {
-        if (parseInt(node.getAttribute('data-cardid'), 10) === state.cardId) {
-          index = i;
-          return true;
-        }
-      });
-
-      if (index !== -1) {
-        this.nav(index);
-      } else {
-        // A forward action in the browser. Nav to a new card.
-        link = parseHref(location.href);
-        this._navLink(link);
+        evt.stopPropagation();
+        evt.preventDefault();
       }
     },
 
@@ -383,9 +385,11 @@ console.log('popstate', state);
       }
 
       // Scan for next jump points and preload the modules for them.
-      slice(node.querySelectorAll('[href], [data-href]'))
+      slice(node.querySelectorAll('[href], [data-href], [data-moduleid]'))
         .forEach(function (node) {
-          var link = parseHref(node.href || node.getAttribute('data-href'));
+          var link = parseHref(node.href ||
+                     node.getAttribute('data-href') ||
+                     node.getAttribute('data-moduleid'));
           if (link.target && link.target.charAt(0) !== '!') {
             modules.push(link.target);
           }
