@@ -1,5 +1,6 @@
 define(function (require, exports, module) {
-  var tempNode = document.createElement('div'),
+  var prim = require('prim'),
+      tempNode = document.createElement('div'),
       version = '1',
       storageVersionId = module.id + '-version',
       storageHtmlId = module.id + '-html',
@@ -108,6 +109,10 @@ define(function (require, exports, module) {
     addEvent(this.node, 'click', this, '_onClick');
   }
 
+  // Expose reset, so that a developer could do a state reset in
+  // the console via require('Deck').reset();
+  Deck.reset = reset;
+
   Deck.init = function (moduleId) {
     // read existing state to know if it needs to be hydrated.
     var docNode, deck,
@@ -139,9 +144,12 @@ define(function (require, exports, module) {
       deck = new Deck();
       document.body.appendChild(deck.node);
       require([moduleId], function (init) {
-        init(deck.makeLocalDeck());
-        deck.saveState();
-        deck._preloadModules();
+        prim().start(function () {
+          return init(deck.makeLocalDeck());
+        }).then(function () {
+          deck.saveState();
+          deck._preloadModules();
+        });
       });
     }
   };

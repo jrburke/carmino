@@ -5,15 +5,20 @@
     <meta name="viewport" content="initial-scale=1, maximum-scale=1">
 
     <link href="app/style/app.css" rel="stylesheet" type="text/css">
+
     <script src="lib/alameda.js"></script>
     <script>
       // For any third party dependencies, like jQuery,
       // place them in the lib folder.
-      requirejs.config({
+      require.config({
           baseUrl: 'lib',
           paths: {
               app: '../app'
           },
+          // Reuse the version of prim/promises
+          // bundled with alameda
+          definePrim: 'prim',
+          // Kick off app loading
           deps: ['app/main']
       });
     </script>
