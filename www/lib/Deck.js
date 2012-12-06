@@ -263,6 +263,7 @@ define(function (require, exports, module) {
       }
 
       var temp,
+          finalIndex = cardIndex,
           beginNode = this.cards[this.index],
           endNode = this.cards[cardIndex],
           isForward = options.direction === 'forward';
@@ -283,7 +284,8 @@ define(function (require, exports, module) {
                                             this.cards.length - cardIndex);
         } else {
           // Trim nodes from the "left"
-          this.deadNodes = this.cards.splice(0, cardIndex);
+          this._deadNodes = this.cards.splice(0, cardIndex);
+          finalIndex = 0;
         }
       }
 
@@ -338,7 +340,7 @@ define(function (require, exports, module) {
 
       this._transitionEndEvent = isForward ? null : 'onShow';
 
-      this.index = cardIndex;
+      this.index = finalIndex;
       this.saveState();
 
       if (options.immediate) {
