@@ -49,9 +49,11 @@ define(function (require, exports, module) {
   }
 
   function parseHref(value) {
+    value = value || location.href;
+
     var parts,
         result = {},
-        index = value ? value.indexOf('#') : -1;
+        index = value.indexOf('#');
 
     if (index !== -1) {
       value = value.substring(index + 1);
@@ -79,6 +81,8 @@ define(function (require, exports, module) {
   function Deck(node, options) {
     options = options || {};
 
+    var restored;
+
     this.id = deckId += 1;
     this.node = node || document.createElement('section');
     this.node.classList.add('deck');
@@ -93,6 +97,7 @@ define(function (require, exports, module) {
     slice(this.node.children).forEach(function (node) {
       var oldCardId = node.getAttribute('data-cardid');
       if (oldCardId) {
+        restored = true;
         oldCardId = parseInt(oldCardId, 10);
         // Rehydrated. Up internal ID to be past this ID.
         if (this.cardIdCounter < oldCardId) {
@@ -121,6 +126,10 @@ define(function (require, exports, module) {
 
     addEvent(this.node, 'transitionend', this, '_onTransitionEnd');
     addEvent(this.node, 'click', this, '_onClick');
+
+    if (restored) {
+      this.notify('onShow', this.cards[this.index]);
+    }
   }
 
   // Expose reset, so that a developer could do a state reset in
@@ -153,6 +162,23 @@ define(function (require, exports, module) {
         var obj = this.handlers[evtName];
         obj.node.removeEventListener(evtName, obj.fn, false);
       });
+    },
+
+    notify: function (evtName, node) {
+      if (node) {
+        var id = node.getAttribute('data-moduleid');
+        if (id) {
+          require([id], function (mod) {
+            if (mod.hasOwnProperty(evtName)) {
+              prim().start(function () {
+                return mod[evtName](node, this.makeLocalDeck(parseHref(), id));
+              }.bind(this)).then(function () {
+                this.saveState();
+              }.bind(this));
+            }
+          }.bind(this));
+        }
+      }
     },
 
     card: function (title, content, options) {
@@ -192,6 +218,7 @@ define(function (require, exports, module) {
       this.node.insertBefore(node, this.cards[0]);
       this.cards.unshift(node);
       this._afterTransition = this._preloadModules.bind(this);
+      options.direction = 'forward';
       this.nav(0, options);
     },
 
@@ -201,6 +228,7 @@ define(function (require, exports, module) {
       this.node.appendChild(node);
       this.cards.push(node);
       this._afterTransition = this._preloadModules.bind(this);
+      options.direction = 'forward';
       this.nav(this.cards.length - 1, options);
     },
 
@@ -259,10 +287,10 @@ define(function (require, exports, module) {
       if (options.immediate) {
         addClass(beginNode, 'no-anim');
         addClass(endNode, 'no-anim');
-      } else {
-        this._transitionCount = (beginNode && endNode) ? 2 : 1;
-        this._animating = true;
       }
+
+      this._transitionCount = (beginNode && endNode && !options.immediate) ? 2 : 1;
+      this._animating = true;
 
       // make sure the reflow sees the correct transition state, whether
       // it is on or off. Otherwise, forward navigation in Firefox
@@ -290,6 +318,11 @@ define(function (require, exports, module) {
         addClass(endNode, 'center');
       }
 
+      this._transitionEndEvent = isForward ? null : 'onShow';
+
+      this.index = cardIndex;
+      this.saveState();
+
       if (options.immediate) {
         // make sure the instantaneous transition is seen before we turn
         // transitions back on.
@@ -297,10 +330,10 @@ define(function (require, exports, module) {
 
         removeClass(beginNode, 'no-anim');
         removeClass(endNode, 'no-anim');
-      }
 
-      this.index = cardIndex;
-      this.saveState();
+        // Manually call transition end to finish up any common work.
+        this._onTransitionEnd();
+      }
     },
 
     back: function () {
@@ -381,11 +414,17 @@ define(function (require, exports, module) {
           addClass(endNode, 'anim-vertical');
         }
 
+        if (this._transitionEndEvent) {
+          this.notify(this._transitionEndEvent, this.cards[this.index]);
+          this._transitionEndEvent = null;
+        }
+
         if (this._afterTransition) {
           afterTransition = this._afterTransition;
           delete this._afterTransition;
           afterTransition();
         }
+
       }
     },
 
