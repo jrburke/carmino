@@ -194,7 +194,17 @@ define(function (require, exports, module) {
 
       html += '<h1>' +
              title +
-             '</h1></header><div class="content">' +
+             '</h1>';
+
+      if (options.toolbar) {
+        html += '<menu type="toolbar">';
+        Object.keys(options.toolbar).forEach(function (name) {
+          html += '<button data-href="' + name + '">' + options.toolbar[name] + '</button>';
+        });
+        html += '</menu>';
+      }
+
+      html += '</header><div class="content">' +
              content +
              '</div></section>';
 

@@ -35,6 +35,10 @@
   transition-property: none;
 }
 
+.card.anim-vertical {
+  z-index: 100;
+}
+
 .card.center {
   -webkit-transform: translateX(0);
   transform: translateX(0);
