@@ -63,7 +63,7 @@ define(function (require, exports, module) {
         result.target = value;
       } else {
         result.target = value.substring(0, index);
-        value = value.substring(index + 1, value);
+        value = value.substring(index + 1);
         parts = value.split('&');
         if (parts && parts.length) {
           result.data = {};
@@ -184,13 +184,21 @@ define(function (require, exports, module) {
     card: function (title, content, options) {
       options = options || {};
 
-      return '<section class="card" role="region"><header>' +
-            (options.back ? '<a data-href="#!back"><span class="icon icon-back"></span></a>' : '') +
-            '<h1>' +
+      var html = '<section class="card ' + (options.cardClass || '') + '" role="region"><header>';
+
+      if (options.back) {
+        html += '<a data-href="#!back"><span class="icon icon-back"></span></a>';
+      } else if (options.menu) {
+        html += '<a data-href="#!menu?action=' + options.menu + '"><span class="icon icon-menu"></span></a>';
+      }
+
+      html += '<h1>' +
              title +
              '</h1></header><div class="content">' +
              content +
              '</div></section>';
+
+      return html;
     },
 
     toCardNode: function (htmlOrNode, href, moduleId, optClass) {
@@ -217,6 +225,7 @@ define(function (require, exports, module) {
       node = this.toCardNode(node, href, moduleId, options.immediate ? 'center' : 'before');
       this.node.insertBefore(node, this.cards[0]);
       this.cards.unshift(node);
+      this.index += 1;
       this._afterTransition = this._preloadModules.bind(this);
       options.direction = 'forward';
       this.nav(0, options);
@@ -264,9 +273,18 @@ define(function (require, exports, module) {
         beginNode = null;
       }
 
-      if (cardIndex < this.cards.length - 1) {
-        this._deadNodes = this.cards.splice(cardIndex + 1,
+      // Trim out dead nodes, ones that are considered "forward" in the
+      // navigation, even though that could happen from either the left
+      // or right side of the current card.
+      if (!isForward) {
+        if (cardIndex < this.index) {
+          // Trim nodes from the "right"
+          this._deadNodes = this.cards.splice(cardIndex + 1,
                                             this.cards.length - cardIndex);
+        } else {
+          // Trim nodes from the "left"
+          this.deadNodes = this.cards.splice(0, cardIndex);
+        }
       }
 
       // If going back and the beginning node was an overlay, do not animate
@@ -338,6 +356,19 @@ define(function (require, exports, module) {
 
     back: function () {
       this.nav(this.index - 1);
+    },
+
+    menu: function (data) {
+      if (this.node.querySelector('.card.menu')) {
+        // Go "back" to other card.
+        this.nav(this.index + 1);
+      } else {
+        // Just a normal nav
+        this._navLink({
+          href: data.action,
+          target: data.action
+        });
+      }
     },
 
     makeLocalDeck: function (href, moduleId) {

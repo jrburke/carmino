@@ -70,3 +70,11 @@ to get the shared styles to show up */
 .card header a span {
   pointer-events: none;
 }
+
+.card.menu {
+  width: calc(100% - 4.3em);
+}
+
+.card.center.menu + .card.after {
+  transform: translateX(calc(100% - 4.3em));
+}

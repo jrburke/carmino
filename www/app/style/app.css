@@ -9,6 +9,12 @@
 
 @import url('../../lib/carmino.css');
 
+* {
+  -moz-box-sizing: border-box;
+  -webkit-box-sizing: border-box;
+  box-sizing: border-box;
+}
+
 html {
   font-family: 'MozTT',sans-serif;
 }
