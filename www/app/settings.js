@@ -23,5 +23,12 @@ define(function () {
     console.log('settings onShow called: ', node);
   };
 
+  settings.onHide = function (node, deck) {
+    console.log('settings onHide called: ', node);
+  };
+
+  settings.onDestroy = function (node, deck) {
+    console.log('settings onDestroy called: ', node);
+  };
   return settings;
 });

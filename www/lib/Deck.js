@@ -30,7 +30,7 @@ define(function (require, exports, module) {
   }
 
   function hasClass(node, name) {
-    return node.classList.contains(name);
+    return node && node.classList.contains(name);
   }
 
   function addClass(node, name) {
@@ -200,12 +200,7 @@ define(function (require, exports, module) {
         if (id) {
           require([id], function (mod) {
             if (mod.hasOwnProperty(evtName)) {
-              prim().start(function () {
-                return mod[evtName](node, this.makeLocalDeck(parseHref(), id));
-              }.bind(this)).then(function () {
-                this.saveState();
-              }.bind(this))
-              .end();
+              mod[evtName](node, this.makeLocalDeck(parseHref(), id));
             }
           }.bind(this));
         }
@@ -396,7 +391,9 @@ define(function (require, exports, module) {
         addClass(endNode, 'center');
       }
 
-      this._transitionEndEvent = isForward ? null : 'onShow';
+      this._beginNode = beginNode;
+      this._endNode = endNode;
+      this._endNodeEvent = isForward ? null : 'onShow';
 
       this.index = finalIndex;
       this.saveState();
@@ -446,7 +443,8 @@ define(function (require, exports, module) {
         create: this.create.bind(this, href, moduleId),
         card: this.card.bind(this),
         before: this.before.bind(this, href, moduleId),
-        after: this.after.bind(this, href, moduleId)
+        after: this.after.bind(this, href, moduleId),
+        saveState: this.saveState.bind(this)
       };
     },
 
@@ -483,7 +481,7 @@ define(function (require, exports, module) {
     },
 
     _onTransitionEnd: function () {
-      var afterTransition, endNode;
+      var afterTransition, endNode, beginNodeDestroyed;
 
       // Do not pay attention to events that are not part of this deck.
       if (!this._animating) {
@@ -501,6 +499,10 @@ define(function (require, exports, module) {
 
         if (this._deadNodes) {
           this._deadNodes.forEach(function (domNode) {
+            if (domNode === this._beginNode) {
+              beginNodeDestroyed = true;
+            }
+
             // Destroy any decks in play, to be good event listener
             // and memory citizens
             slice(domNode.querySelectorAll('[data-deckid]'))
@@ -509,26 +511,46 @@ define(function (require, exports, module) {
             // This node could be a deck.
             cleanRegistry(domNode);
 
+            // Notify controllers of card destruction
+            slice(domNode.querySelectorAll('[data-cardid]'))
+              .forEach(function (cardNode) {
+                this.notify('onDestroy', cardNode);
+              }.bind(this));
+
+            if (!hasClass(domNode, 'deck')) {
+              this.notify('onDestroy', domNode);
+            }
+
             // Clean up the DOM
             if (domNode.parentNode) {
               domNode.parentNode.removeChild(domNode);
             }
-          });
+          }.bind(this));
           this._deadNodes = [];
         }
 
         // If a vertical overlay transition was disabled, if
         // current node index is an overlay, enable it again.
-        endNode = this.cards[this.index];
-        if (endNode.classList.contains('disabled-anim-vertical')) {
-          removeClass(endNode, 'disabled-anim-vertical');
-          addClass(endNode, 'anim-vertical');
+        endNode = this._endNode;
+        if (endNode) {
+          if (endNode.classList.contains('disabled-anim-vertical')) {
+            removeClass(endNode, 'disabled-anim-vertical');
+            addClass(endNode, 'anim-vertical');
+          }
+          if (this._endNodeEvent) {
+            this.notify(this._endNodeEvent, endNode);
+            this._endNodeEvent = null;
+          }
         }
 
-        if (this._transitionEndEvent) {
-          this.notify(this._transitionEndEvent, this.cards[this.index]);
-          this._transitionEndEvent = null;
+        // Notify beginNode on being hidden, but do not do so if
+        // it has already been destroyed and onDestroy triggered.
+        if (!beginNodeDestroyed && !hasClass(this._beginNode, 'deck')) {
+          this.notify('onHide', this._beginNode);
         }
+
+        this._beginNode = null;
+        this._endNode = null;
 
         if (this._afterTransition) {
           afterTransition = this._afterTransition;
