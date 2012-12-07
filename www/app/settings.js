@@ -1,13 +1,22 @@
 define(function () {
   function settings(deck, data) {
-    deck.before(deck.card('Settings',
-    '  <button> Setting 1 </button>' +
-    '<div class="bottom-toolbar"><button data-href="app/settings" class="settings bottom-btn"></button></div>', {
-      cardClass: 'skin-organic anim-vertical anim-overlay',
-      toolbar: {
-        '#!back': 'Done'
-      }
-    }));
+    var d, card;
+
+    card = deck.card('Settings',
+      '  <button data-href="#app/next"> Setting 1 </button>' +
+      '<div class="bottom-toolbar"></div>', {
+        cardClass: 'skin-organic',
+        toolbar: {
+          '#!back': 'Done'
+        }
+      });
+
+    d = deck.create({
+      deckClass: 'anim-vertical anim-overlay',
+      card: card
+    });
+
+    deck.before(d);
   }
 
   settings.onShow = function (node, deck) {

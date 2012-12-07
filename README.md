@@ -3,6 +3,7 @@
 ::experimental: nothing works, it is a mess, and may completely fail
 
 TODO
+* rehydrate w/ multiple "center" tags
 * generate appcache
 
 Build web apps targeted for mobile apps using a card metaphor. Each

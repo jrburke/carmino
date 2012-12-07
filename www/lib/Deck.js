@@ -1,6 +1,7 @@
 define(function (require, exports, module) {
   var tempDeck, html, deckNode,
       prim = require('prim'),
+      registry = {},
       tempNode = document.createElement('div'),
       version = '1',
       storageVersionId = module.id + '-version',
@@ -12,6 +13,12 @@ define(function (require, exports, module) {
     localStorage.setItem(storageVersionId, version);
     localStorage.removeItem(storageHtmlId);
   }
+
+  window.addEventListener('error', function (evt) {
+    // On an app error, reset state so app does not get stuck in a weird state.
+    reset();
+    throw evt;
+  }, false);
 
   // If version does not match this version of Deck, then reset.
   if (storedVersion !== version) {
@@ -48,6 +55,15 @@ define(function (require, exports, module) {
     evt.preventDefault();
   }
 
+  function cleanRegistry(node) {
+    var id = 'id' + node.getAttribute('data-deckid'),
+        deck = registry[id];
+    if (deck) {
+      deck.destroy();
+      delete registry[id];
+    }
+  }
+
   function parseHref(value) {
     value = value || location.href;
 
@@ -81,11 +97,20 @@ define(function (require, exports, module) {
   function Deck(node, options) {
     options = options || {};
 
-    var restored;
+    var indexSet, restored;
 
     this.id = deckId += 1;
     this.node = node || document.createElement('section');
     this.node.classList.add('deck');
+
+    registry['id' + this.id] = this;
+
+    if (options.deckClass) {
+      options.deckClass.split(' ').forEach(function (cls) {
+        addClass(this.node, cls);
+      }.bind(this));
+    }
+
     this.cards = [];
     this.handlers = {};
     this.cardIdCounter = 0;
@@ -109,7 +134,10 @@ define(function (require, exports, module) {
 
       if (hasClass(node, 'card')) {
         this.cards.push(node);
-        if (hasClass(node, 'center')) {
+        if (!indexSet && hasClass(node, 'center')) {
+          // Choose the first "center" card. With menu/settings,
+          // the
+          indexSet = true;
           this.index = this.cards.length - 1;
         }
       }
@@ -136,6 +164,8 @@ define(function (require, exports, module) {
   // the console via require('Deck').reset();
   Deck.reset = reset;
 
+  Deck.registry = registry;
+
   Deck.init = function (moduleId) {
     // If no deckNode from initial hydration (done at end of this file)
     // then init a new deck.
@@ -148,7 +178,7 @@ define(function (require, exports, module) {
         }).then(function () {
           deck.saveState();
           deck._preloadModules();
-        });
+        }).end();
       });
     }
 
@@ -161,7 +191,7 @@ define(function (require, exports, module) {
       Object.keys(this.handlers).forEach(function (evtName) {
         var obj = this.handlers[evtName];
         obj.node.removeEventListener(evtName, obj.fn, false);
-      });
+      }.bind(this));
     },
 
     notify: function (evtName, node) {
@@ -174,11 +204,26 @@ define(function (require, exports, module) {
                 return mod[evtName](node, this.makeLocalDeck(parseHref(), id));
               }.bind(this)).then(function () {
                 this.saveState();
-              }.bind(this));
+              }.bind(this))
+              .end();
             }
           }.bind(this));
         }
       }
+    },
+
+    create: function (href, moduleId, options) {
+      var deck = new Deck(null, {
+        deckClass: options.deckClass
+      });
+
+      deck.parent = this;
+
+      if (options.card) {
+        deck.after(href, moduleId, options.card, {immediate: true});
+      }
+
+      return deck.node;
     },
 
     card: function (title, content, options) {
@@ -223,6 +268,7 @@ define(function (require, exports, module) {
       htmlOrNode.setAttribute('data-location', href || '');
 
       addClass(htmlOrNode, 'card');
+
       if (optClass) {
         addClass(htmlOrNode, optClass);
       }
@@ -232,7 +278,8 @@ define(function (require, exports, module) {
 
     before: function (href, moduleId, node, options) {
       options = options || {};
-      node = this.toCardNode(node, href, moduleId, options.immediate ? 'center' : 'before');
+      node = this.toCardNode(node, href, moduleId,
+                             options.immediate ? 'center' : 'before');
       this.node.insertBefore(node, this.cards[0]);
       this.cards.unshift(node);
       this.index += 1;
@@ -243,7 +290,8 @@ define(function (require, exports, module) {
 
     after: function (href, moduleId, node, options) {
       options = options || {};
-      node = this.toCardNode(node, href, moduleId, options.immediate ? 'center' : 'after');
+      node = this.toCardNode(node, href, moduleId,
+                             options.immediate ? 'center' : 'after');
       this.node.appendChild(node);
       this.cards.push(node);
       this._afterTransition = this._preloadModules.bind(this);
@@ -367,7 +415,17 @@ define(function (require, exports, module) {
     },
 
     back: function () {
-      this.nav(this.index - 1);
+      if (this.index === 0) {
+        if (this.cards.length === 1 && this.parent) {
+          this.parent.back();
+        } else {
+          // A "back" from a card that was added to the front of the queue,
+          // like a settings screen.
+          this.nav(1);
+        }
+      } else {
+        this.nav(this.index - 1);
+      }
     },
 
     menu: function (data) {
@@ -385,6 +443,7 @@ define(function (require, exports, module) {
 
     makeLocalDeck: function (href, moduleId) {
       return {
+        create: this.create.bind(this, href, moduleId),
         card: this.card.bind(this),
         before: this.before.bind(this, href, moduleId),
         after: this.after.bind(this, href, moduleId)
@@ -442,6 +501,15 @@ define(function (require, exports, module) {
 
         if (this._deadNodes) {
           this._deadNodes.forEach(function (domNode) {
+            // Destroy any decks in play, to be good event listener
+            // and memory citizens
+            slice(domNode.querySelectorAll('[data-deckid]'))
+              .forEach(cleanRegistry);
+
+            // This node could be a deck.
+            cleanRegistry(domNode);
+
+            // Clean up the DOM
             if (domNode.parentNode) {
               domNode.parentNode.removeChild(domNode);
             }
