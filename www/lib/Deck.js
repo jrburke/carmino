@@ -9,6 +9,12 @@ define(function (require, exports, module) {
       storedVersion = localStorage.getItem(storageVersionId),
       deckId = 0;
 
+  // Hack for webkit browsers
+  // https://bugs.webkit.org/show_bug.cgi?id=104390
+  if ('webkitTransform' in document.body.style) {
+    document.body.classList.add('webkit');
+  }
+
   function reset() {
     localStorage.setItem(storageVersionId, version);
     localStorage.removeItem(storageHtmlId);
@@ -97,7 +103,8 @@ define(function (require, exports, module) {
   function Deck(node, options) {
     options = options || {};
 
-    var indexSet, restored;
+    var indexSet, restored,
+        transitionEventName = 'transitionend';
 
     this.id = deckId += 1;
     this.node = node || document.createElement('section');
@@ -152,7 +159,14 @@ define(function (require, exports, module) {
       this._preloadModules();
     }
 
-    addEvent(this.node, 'transitionend', this, '_onTransitionEnd');
+
+    if ('webkitTransition' in this.node.style) {
+      transitionEventName = 'webkitTransitionEnd';
+    } else if ('OTransition' in this.node.style) {
+      transitionEventName = 'otransitionend';
+    }
+
+    addEvent(this.node, transitionEventName, this, '_onTransitionEnd');
     addEvent(this.node, 'click', this, '_onClick');
 
     if (restored) {
@@ -295,8 +309,15 @@ define(function (require, exports, module) {
     },
 
     saveState: function () {
-      var node = this.cards[this.index],
-          href = node.getAttribute('data-location') || '';
+      var href,
+          node = this.cards[this.index];
+
+      if (!node) {
+        // Card setup is not done
+        return;
+      }
+
+      href = node.getAttribute('data-location') || '';
 
       location.replace('#' + href);
 
