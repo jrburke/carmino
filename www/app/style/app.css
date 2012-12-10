@@ -28,6 +28,14 @@ div.content {
   background-size: auto auto, 100% 100%;
 }
 
+.list-item {
+  display: block;
+  position: relative;
+  overflow: hidden;
+  height: 8em;
+  border-bottom: 1px solid lightgray;
+}
+
 .bottom-toolbar {
   position: absolute;
   left: 0;

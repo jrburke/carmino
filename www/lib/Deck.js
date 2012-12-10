@@ -190,7 +190,6 @@ define(function (require, exports, module) {
         prim().start(function () {
           return init(deck.makeLocalDeck('', moduleId));
         }).then(function () {
-          deck.saveState();
           deck._preloadModules();
         }).end();
       });
@@ -312,6 +311,7 @@ define(function (require, exports, module) {
       var href,
           node = this.cards[this.index];
 
+console.log('saveState: ' + this.index, node);
       if (!node) {
         // Card setup is not done
         return;
@@ -333,6 +333,8 @@ define(function (require, exports, module) {
 
       // Do not do anything if this is a show card for the current card.
       if (cardIndex === this.index) {
+        // The state of the HTML could have still changed, so write it out here.
+        this.saveState();
         return;
       }
 
@@ -417,7 +419,6 @@ define(function (require, exports, module) {
       this._endNodeEvent = isForward ? null : 'onShow';
 
       this.index = finalIndex;
-      this.saveState();
 
       if (options.immediate) {
         // make sure the instantaneous transition is seen before we turn
@@ -579,6 +580,7 @@ define(function (require, exports, module) {
           afterTransition();
         }
 
+        this.saveState();
       }
     },
 
