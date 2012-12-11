@@ -3,14 +3,15 @@ define(function (require) {
       tmpl = require('tmpl!./listing.html');
 
   function listing(deck) {
-console.log('listing Called');
     feeds.fetch().then(function (feed) {
-console.log('FEED: ', feed);
+
+      console.log('FEED: ', feed);
 
       //Add some URI-encoded value for the urls
       if (feed.entries) {
         feed.entries.forEach(function (entry) {
-          entry.linkEncoded = encodeURIComponent(entry.link);
+          entry.linkEncoded = 'author=' + encodeURIComponent(feed.feedUrl) +
+                              '&id=' + encodeURIComponent(entry.link);
         });
       }
 

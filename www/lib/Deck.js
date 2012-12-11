@@ -70,6 +70,14 @@ define(function (require, exports, module) {
     }
   }
 
+  function htmlEscape(value) {
+    return value
+           .replace(/</g, '&lt;')
+           .replace(/\>/g, '&gt;')
+           .replace(/\&/g, '&amp;')
+           .replace(/\"/g, '&quot;');
+  }
+
   function parseHref(value) {
     value = value || location.href;
 
@@ -246,7 +254,7 @@ define(function (require, exports, module) {
       }
 
       html += '<h1>' +
-             title +
+             htmlEscape(title) +
              '</h1>';
 
       if (options.toolbar) {
@@ -291,7 +299,7 @@ define(function (require, exports, module) {
       this.node.insertBefore(node, this.cards[0]);
       this.cards.unshift(node);
       this.index += 1;
-      this._afterTransition = this._preloadModules.bind(this);
+      this._afterTransition = this._preloadModules;
       options.direction = 'forward';
       this.nav(0, options);
     },
@@ -302,7 +310,7 @@ define(function (require, exports, module) {
                              options.immediate ? 'center' : 'after');
       this.node.appendChild(node);
       this.cards.push(node);
-      this._afterTransition = this._preloadModules.bind(this);
+      this._afterTransition = this._preloadModules;
       options.direction = 'forward';
       this.nav(this.cards.length - 1, options);
     },
@@ -311,7 +319,6 @@ define(function (require, exports, module) {
       var href,
           node = this.cards[this.index];
 
-console.log('saveState: ' + this.index, node);
       if (!node) {
         // Card setup is not done
         return;
@@ -333,6 +340,10 @@ console.log('saveState: ' + this.index, node);
 
       // Do not do anything if this is a show card for the current card.
       if (cardIndex === this.index) {
+        // Could be an immediate injection, first card in the stack. Still do
+        // post transition processing, like preloading next actions.
+        this._handleAfterTransition();
+
         // The state of the HTML could have still changed, so write it out here.
         this.saveState();
         return;
@@ -503,7 +514,7 @@ console.log('saveState: ' + this.index, node);
     },
 
     _onTransitionEnd: function () {
-      var afterTransition, endNode, beginNodeDestroyed;
+      var endNode, beginNodeDestroyed;
 
       // Do not pay attention to events that are not part of this deck.
       if (!this._animating) {
@@ -574,13 +585,17 @@ console.log('saveState: ' + this.index, node);
         this._beginNode = null;
         this._endNode = null;
 
-        if (this._afterTransition) {
-          afterTransition = this._afterTransition;
-          delete this._afterTransition;
-          afterTransition();
-        }
+        this._handleAfterTransition();
 
         this.saveState();
+      }
+    },
+
+    _handleAfterTransition: function () {
+      if (this._afterTransition) {
+        var afterTransition = this._afterTransition;
+        delete this._afterTransition;
+        afterTransition.call(this);
       }
     },
 

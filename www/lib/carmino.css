@@ -76,6 +76,12 @@ to get the shared styles to show up */
   pointer-events: none;
 }
 
+.card > .content {
+  height: calc(100% - 5em);
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
 .card.menu {
   width: -webkit-calc(100% - 4.3em);
   width: calc(100% - 4.3em);

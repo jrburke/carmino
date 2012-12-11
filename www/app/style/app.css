@@ -15,6 +15,11 @@
   box-sizing: border-box;
 }
 
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
 html {
   font-family: 'MozTT',sans-serif;
 }
@@ -34,6 +39,29 @@ div.content {
   overflow: hidden;
   height: 8em;
   border-bottom: 1px solid lightgray;
+}
+
+.list-item .title {
+  margin: 1em 0 0 0;
+  font-weight: bold;
+  font-size: x-large;
+  pointer-events: none;
+}
+
+.list-item .description {
+  font-size: larger;
+  pointer-events: none;
+}
+
+.detail-title {
+  margin: 1em 0 0 0;
+  font-weight: bold;
+  font-size: x-large;
+}
+
+.detail-content a {
+  color: blue;
+  text-decoration: underline;
 }
 
 .bottom-toolbar {
