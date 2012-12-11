@@ -613,8 +613,10 @@ define(function (require, exports, module) {
         .forEach(function (node) {
           var link = parseHref(node.href ||
                      node.getAttribute('data-href') ||
-                     node.getAttribute('data-moduleid'));
-          if (link.target && link.target.charAt(0) !== '!') {
+                     node.getAttribute('data-moduleid')),
+              validHost = !node.href || (node.hostname === location.hostname);
+
+          if (validHost && link.target && link.target.charAt(0) !== '!') {
             modules.push(link.target);
           }
         });

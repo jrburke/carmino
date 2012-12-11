@@ -1,5 +1,6 @@
 define(function (require) {
-  var prim = require('prim'),
+  var feeds,
+      prim = require('prim'),
       offline = false,
       apiSent = false,
       apiResult = prim(),
@@ -22,43 +23,49 @@ define(function (require) {
     return apiPromise;
   }
 
-  return {
+  feeds = {
     detail: function (author, id) {
-      return feedsPromise.then(function (feed) {
-        // Faking author right now.
-        var entry;
+      return feeds.fetch().then(function () {
+        return feedsPromise.then(function (feed) {
+          // Faking author right now.
+          var entry;
 
-        if (feed.entries) {
-          feed.entries.some(function (e) {
-            if (e.link === id) {
-              entry = e;
-              return true;
-            }
-          });
-        }
+          if (feed.entries) {
+            feed.entries.some(function (e) {
+              if (e.link === id) {
+                entry = e;
+                return true;
+              }
+            });
+          }
 
-        return {
-          feed: feed,
-          entry: entry
-        };
+          return {
+            feed: feed,
+            entry: entry
+          };
+        });
       });
     },
 
     fetch: function () {
-      return when().then(function (api) {
-        var f = new api.Feed('https://blog.mozilla.org/feed/');
-
-        f.load(function (result) {
-          if (result.error) {
-            feedsResult.reject(result.error);
-            return;
-          }
-
-          feedsResult.resolve(result.feed);
-        });
-
+      if (feedsResult.finished()) {
         return feedsPromise;
-      });
+      } else {
+        return when().then(function (api) {
+          var f = new api.Feed('https://blog.mozilla.org/feed/');
+
+          f.load(function (result) {
+            if (result.error) {
+              feedsResult.reject(result.error);
+              return;
+            }
+
+            feedsResult.resolve(result.feed);
+          });
+
+          return feedsPromise;
+        });
+      }
     },
 
     getUrls: function () {
@@ -77,4 +84,6 @@ define(function (require) {
       return d.promise;
     }
   };
+
+  return feeds;
 });
