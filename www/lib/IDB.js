@@ -55,10 +55,8 @@ define(['prim'], function (prim) {
         if (!missingStores.length) {
           d.resolve(db);
         } else if (options.onupgradeneeded) {
-          setTimeout(function () {
-            options.onupgradeneeded(db);
-            d.resolve(db);
-          }, 10);
+          options.onupgradeneeded(db);
+          d.resolve(db);
         } else {
           d.reject(new Error('Missing stores' + missingStores));
         }
@@ -102,85 +100,76 @@ define(['prim'], function (prim) {
   IDB.prototype = {
     prom: prom,
 
-    // Eventually returns the object store from a transaction in the given
-    // mode: 'readonly', 'readwrite' or 'versionchange'
-    tx: function (mode, storeName) {
+    // Eventually passes the object store from a transaction in the given
+    // mode: 'readonly', 'readwrite' or 'versionchange' to the function fn
+    // fn(objectStore) should return a value, probably a promise or prom()
+    // wrapping of a DOM request object.
+    tx: function (mode, fn, storeName) {
       storeName = storeName || this.storeName;
       return this.dbp.then(function (db) {
-        return db.transaction(storeName, mode);
+        return fn(db.transaction(storeName, mode).objectStore(storeName));
       });
     },
 
     put: function (value, key, storeName) {
-      storeName = storeName || this.storeName;
-      return this.tx(TX.READ_WRITE, storeName).then(function (tx) {
-        return prom(tx.objectStore(storeName).put(value, key));
-      });
+      return this.tx('readwrite', function (store) {
+        return prom(store.put(value, key));
+      }, storeName);
     },
 
     add: function (value, key, storeName) {
-      storeName = storeName || this.storeName;
-      return this.tx(TX.READ_WRITE, storeName).then(function (tx) {
-        return prom(tx.objectStore(storeName).add(value, key));
-      });
+      return this.tx('readwrite', function (store) {
+        return prom(store.add(value, key));
+      }, storeName);
     },
 
     del: function (key, storeName) {
-      storeName = storeName || this.storeName;
-      return this.tx(TX.READ_WRITE, storeName).then(function (tx) {
-        return prom(tx.objectStore(storeName)['delete'](key));
-      });
+      return this.tx('readwrite', function (store) {
+        return prom(store['delete'](key));
+      }, storeName);
     },
 
     get: function (key, storeName) {
-      storeName = storeName || this.storeName;
-      return this.tx(TX.READ_ONLY, storeName).then(function (tx) {
-        return prom(tx.objectStore(storeName).get(key));
-      });
+      return this.tx('readonly', function (store) {
+        return prom(store.get(key));
+      }, storeName);
     },
 
     clear: function (storeName) {
-      storeName = storeName || this.storeName;
-      return this.tx(TX.READ_WRITE, storeName).then(function (tx) {
-        return prom(tx.objectStore(storeName).clear());
-      });
+      return this.tx('readwrite', function (store) {
+        return prom(store.clear());
+      }, storeName);
     },
 
     count: function (key, storeName) {
-      storeName = storeName || this.storeName;
-      return this.tx(TX.READ_WRITE, storeName).then(function (tx) {
-        var os = tx.objectStore(storeName);
-        return prom(os.count(key));
-      });
+      return this.tx('readonly', function (store) {
+        return prom(store.count(key));
+      }, storeName);
     },
 
     openCursor: function (range, direction, storeName) {
-      storeName = storeName || this.storeName;
-      return this.tx(TX.READ_ONLY, storeName).then(function (tx) {
-        return prom(tx.objectStore(storeName).openCursor(range, direction));
-      });
+      return this.tx('readonly', function (store) {
+        return prom(store.openCursor(range, direction));
+      }, storeName);
     },
 
     // index stuff
     createIndex: function (name, keyPath, optionalParameters, storeName) {
-      storeName = storeName || this.storeName;
-      return this.tx(TX.READ_WRITE, storeName).then(function (tx) {
-        return tx.objectStore(storeName).createIndex(name, keyPath, optionalParameters);
-      });
+      return this.tx('readwrite', function (store) {
+        return store.createIndex(name, keyPath, optionalParameters);
+      }, storeName);
     },
 
     index: function (name, storeName) {
-      storeName = storeName || this.storeName;
-      return this.tx(TX.READ_ONLY, storeName).then(function (tx) {
-        return tx.objectStore(storeName).index(name);
-      });
+      return this.tx('readonly', function (store) {
+        return store.index(name);
+      }, storeName);
     },
 
     deleteIndex: function (name, storeName) {
-      storeName = storeName || this.storeName;
-      return this.tx(TX.READ_WRITE, storeName).then(function (tx) {
-        return tx.objectStore(storeName).deleteIndex(name);
-      });
+      return this.tx('readwrite', function (store) {
+        return store.deleteIndex(name);
+      }, storeName);
     }
   };
 
