@@ -1,3 +1,5 @@
+/*global console */
+
 define(['prim'], function (prim) {
   var api = window.indexedDB || window.webkitIndexedDB || window.mozIndexedDB || window.msIndexedDB,
       TX = window.IDBTransaction,
@@ -30,9 +32,8 @@ define(['prim'], function (prim) {
     return primquest(request).promise;
   }
 
-  function IDB(id, version, options) {
-    options = options || {};
 
+  function generateDbPromise(id, version, options, anotherD) {
     function resolve(db) {
       var missingStores = [];
 
@@ -56,7 +57,9 @@ define(['prim'], function (prim) {
           d.resolve(db);
         } else if (options.onupgradeneeded) {
           options.onupgradeneeded(db);
-          d.resolve(db);
+          // Get a new handle on the db, since the upgrade may
+          // have rendered current db connection invalid for mods.
+          generateDbPromise(id, version, options, d);
         } else {
           d.reject(new Error('Missing stores' + missingStores));
         }
@@ -74,7 +77,9 @@ define(['prim'], function (prim) {
       upgradeCalled = true;
       if (options.onupgradeneeded) {
         options.onupgradeneeded(db);
-        resolve(db);
+        // Get a new handle on the db, since the upgrade may
+        // have rendered current db connection invalid for mods.
+        generateDbPromise(id, version, options, d);
       } else {
         d.reject(evt);
       }
@@ -87,11 +92,36 @@ define(['prim'], function (prim) {
       d.reject(evt);
     };
 
-    this.dbp = d.promise;
+    if (anotherD) {
+      d.promise.then(function (db) {
+        anotherD.resolve(db);
+      });
+    } else {
+      return d.promise;
+    }
+  }
+
+  function IDB(id, version, options) {
+    options = options || {};
+
+    if (typeof options === 'string') {
+      options = {
+        storeName: options
+      };
+    }
+
     this.storeName = options.storeName || id + 'Store';
+    this.dbp = generateDbPromise(id, version, options);
   }
 
   IDB.api = api;
+  IDB.log = function (p) {
+    p.then(function (value) {
+      console.log(value);
+    }, function (err) {
+      console.error(err);
+    });
+  };
 
   IDB.deleteDatabase = function (id) {
     return primquest(api.deleteDatabase(id)).promise;
