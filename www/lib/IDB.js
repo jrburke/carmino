@@ -1,17 +1,14 @@
 /*global console */
 
 define(['prim'], function (prim) {
-  var api = window.indexedDB || window.webkitIndexedDB || window.mozIndexedDB || window.msIndexedDB,
-      TX = window.IDBTransaction,
+  var allKeyProp,
+      api = window.indexedDB || window.webkitIndexedDB || window.msIndexedDB,
       dbEvents = ['onabort', 'onerror', 'onversionchange'];
 
-  if (!TX) {
-    TX = {
-      READ_ONLY: 'readonly',
-      READ_WRITE: 'readwrite',
-      VERSION_CHANGE: 'versionchange'
-    };
-  }
+  allKeyProp = {
+    'all': 'openCursor',
+    'allKey': 'openKeyCursor'
+  };
 
   function primquest(request, resolve) {
     var d = prim();
@@ -32,6 +29,33 @@ define(['prim'], function (prim) {
     return primquest(request).promise;
   }
 
+  function withCursor(request, cursorFn) {
+    var d = prim();
+
+    request.onsuccess = function (evt) {
+      var cursor = evt.target.result;
+      cursorFn(cursor, d);
+    };
+
+    request.onerror = function (evt) {
+      d.reject(evt);
+    };
+
+    return d.promise;
+  }
+
+  function makeAllCursorFn() {
+    var ary = [];
+
+    return function (cursor, d) {
+      if (cursor) {
+        ary.push(cursor.value);
+        cursor['continue']();
+      } else {
+        d.resolve(ary);
+      }
+    };
+  }
 
   function generateDbPromise(id, version, options, anotherD) {
     function resolve(db) {
@@ -115,6 +139,9 @@ define(['prim'], function (prim) {
   }
 
   IDB.api = api;
+
+  IDB.KeyRange = window.IDBKeyRange || window.webkitIDBKeyRange || window.msIDBKeyRange;
+
   IDB.log = function (p) {
     p.then(function (value) {
       console.log(value);
@@ -177,9 +204,22 @@ define(['prim'], function (prim) {
       }, storeName);
     },
 
-    openCursor: function (range, direction, storeName) {
+    all: function (range, direction, storeName) {
+      return this.openCursor(range, direction, makeAllCursorFn(), storeName);
+    },
+
+    openCursor: function (range, direction, cursorFn, storeName) {
       return this.tx('readonly', function (store) {
-        return prom(store.openCursor(range, direction));
+        var req;
+
+        // FF (maybe others?) is sensitive about sending undefined/null args
+        if (range === undefined && direction === undefined) {
+          req = store.openCursor();
+        } else {
+          req = store.openCursor(range, direction);
+        }
+
+        return withCursor(req, cursorFn);
       }, storeName);
     },
 
@@ -190,9 +230,29 @@ define(['prim'], function (prim) {
       }, storeName);
     },
 
-    index: function (name, storeName) {
+    index: function (name, prop, propArgs, cursorFn, storeName) {
       return this.tx('readonly', function (store) {
-        return store.index(name);
+        var req,
+            index = store.index(name);
+
+        if (prop) {
+          propArgs = propArgs || [];
+
+          if (prop === 'all' || prop === 'allKey') {
+            req = index[allKeyProp[prop]].apply(index, propArgs);
+            return withCursor(req, makeAllCursorFn());
+          } else {
+            req = index[prop].apply(index, propArgs);
+
+            if (prop === 'openCursor' || prop === 'openKeyCursor') {
+              return withCursor(req, cursorFn);
+            } else {
+              return prom(req);
+            }
+          }
+        } else {
+          return index;
+        }
       }, storeName);
     },
 
