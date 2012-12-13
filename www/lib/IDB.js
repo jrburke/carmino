@@ -29,6 +29,37 @@ define(['prim'], function (prim) {
     return primquest(request).promise;
   }
 
+  function waitAll(ary) {
+    var hasFail,
+        d = prim(),
+        results = [],
+        max = ary.length,
+        count = 0;
+
+    function done(val, i) {
+      results[i] = val;
+      count += 1;
+      if (count === max) {
+        if (hasFail) {
+          d.reject(results);
+        } else {
+          d.resolve(results);
+        }
+      }
+    }
+
+    ary.forEach(function (p, i) {
+      p.then(function (val) {
+        done(val, i);
+      }, function (err) {
+        hasFail = true;
+        done(err, i);
+      });
+    });
+
+    return d.promise;
+  }
+
   function withCursor(request, cursorFn) {
     var d = prim();
 
@@ -174,15 +205,42 @@ define(['prim'], function (prim) {
       }, storeName);
     },
 
+    // Pass an array of [value, key] arrays.
+    putBulk: function (valKeyAry, storeName) {
+      return this.tx('readwrite', function (store) {
+        return waitAll(valKeyAry.map(function (valKey) {
+          return prom(store.put(valKey[0], valKey[1]));
+        }));
+      }, storeName);
+    },
+
     add: function (value, key, storeName) {
       return this.tx('readwrite', function (store) {
         return prom(store.add(value, key));
       }, storeName);
     },
 
+    // Pass an array of [value, key] arrays.
+    addBulk: function (valKeyAry, storeName) {
+      return this.tx('readwrite', function (store) {
+        return waitAll(valKeyAry.map(function (valKey) {
+          return prom(store.add(valKey[0], valKey[1]));
+        }));
+      }, storeName);
+    },
+
     del: function (key, storeName) {
       return this.tx('readwrite', function (store) {
         return prom(store['delete'](key));
+      }, storeName);
+    },
+
+    // Pass an array of keys.
+    delBulk: function (keys, storeName) {
+      return this.tx('readwrite', function (store) {
+        return waitAll(keys.map(function (key) {
+          return prom(store.put(key));
+        }));
       }, storeName);
     },
 
