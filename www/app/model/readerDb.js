@@ -8,12 +8,12 @@ define(function (require) {
   options = {
     stores: ['feeds', 'entries'],
     onupgradeneeded: function (db) {
-      db.createObjectStore('feeds', { keyPath: 'feedUrl' });
+      db.createObjectStore('feeds', { keyPath: 'feedUrl', autoIncrement: false });
 
-      var entryStore = db.createObjectStore('entries', { keyPath: 'link' });
+      var entryStore = db.createObjectStore('entries', { keyPath: 'link', autoIncrement: false });
 
       entryStore.createIndex('feedUrl', 'feedUrl', { unique: false });
-      entryStore.createIndex('published', 'published', { unique: false });
+      entryStore.createIndex('publishedTime', 'publishedTime', { unique: false });
     }
   };
 
@@ -36,4 +36,6 @@ define(function (require) {
       return IDB.deleteDatabase(dbName);
     }
   };
+
+  return readerDb;
 });

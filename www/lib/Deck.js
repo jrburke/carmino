@@ -23,6 +23,7 @@ define(function (require, exports, module) {
   window.addEventListener('error', function (evt) {
     // On an app error, reset state so app does not get stuck in a weird state.
     reset();
+    console.error(evt);
     throw evt;
   }, false);
 

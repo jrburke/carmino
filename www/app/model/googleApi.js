@@ -4,9 +4,7 @@ define(function (require) {
       offline = false,
       apiSent = false,
       apiResult = prim(),
-      feedsResult = prim(),
-      apiPromise = apiResult.promise,
-      feedsPromise = feedsResult.promise;
+      apiPromise = apiResult.promise;
 
   function when() {
     if (!apiSent) {
@@ -23,26 +21,40 @@ define(function (require) {
     return apiPromise;
   }
 
+  function convertEntries(feed, entries) {
+    return (entries || []).map(function (entry) {
+      return {
+        link: entry.link,
+        title: entry.title,
+        author: entry.author || feed.author || feed.title,
+        preview : entry.contentSnippet,
+        content: entry.content,
+        publishedDate: entry.publishedDate,
+        publishedTime: new Date(entry.publishedDate).getTime(),
+        feedUrl : feed.feedUrl
+      };
+    });
+  }
+
   googleApi = {
     fetch: function (url) {
-      if (feedsResult.finished()) {
-        return feedsPromise;
-      } else {
-        return when().then(function (api) {
-          var f = new api.Feed(url);
+      return when().then(function (api) {
+        var d = prim(),
+            f = new api.Feed(url);
 
-          f.load(function (result) {
-            if (result.error) {
-              feedsResult.reject(result.error);
-              return;
-            }
+        f.load(function (result) {
+          if (result.error) {
+            d.reject(result.error);
+            return;
+          }
 
-            feedsResult.resolve(result.feed);
-          });
+          result.feed.entries = convertEntries(result.feed, result.feed.entries);
 
-          return feedsPromise;
+          d.resolve(result.feed);
         });
-      }
+
+        return d.promise;
+      });
     },
 
     find: function (query) {

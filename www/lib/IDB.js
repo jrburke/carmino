@@ -1,6 +1,6 @@
 /*global console */
 
-define(['prim'], function (prim) {
+define(['prim', 'events'], function (prim, events) {
   var allKeyProp,
       api = window.indexedDB || window.webkitIndexedDB || window.msIndexedDB,
       dbEvents = ['onabort', 'onerror', 'onversionchange'];
@@ -18,7 +18,11 @@ define(['prim'], function (prim) {
     };
 
     request.onsuccess = function () {
-      (resolve || d.resolve)(request.result);
+      if (resolve) {
+        resolve(request.result);
+      } else if (!d._waitingForOtherResolve) {
+        d.resolve(request.result);
+      }
     };
 
     return d;
@@ -114,6 +118,7 @@ define(['prim'], function (prim) {
           options.onupgradeneeded(db);
           // Get a new handle on the db, since the upgrade may
           // have rendered current db connection invalid for mods.
+          d._waitingForOtherResolve = true;
           generateDbPromise(id, version, options, d);
         } else {
           d.reject(new Error('Missing stores' + missingStores));
@@ -132,9 +137,8 @@ define(['prim'], function (prim) {
       upgradeCalled = true;
       if (options.onupgradeneeded) {
         options.onupgradeneeded(db);
-        // Get a new handle on the db, since the upgrade may
-        // have rendered current db connection invalid for mods.
-        generateDbPromise(id, version, options, d);
+        // The request.onsuccess callback will be fired after onupgradeneeded
+        // runs, so no need to call back in and get a new db.
       } else {
         d.reject(evt);
       }
@@ -165,6 +169,8 @@ define(['prim'], function (prim) {
       };
     }
 
+    events.mix(this);
+
     this.storeName = options.storeName || id + 'Store';
     this.dbp = generateDbPromise(id, version, options);
   }
@@ -185,6 +191,8 @@ define(['prim'], function (prim) {
     return primquest(api.deleteDatabase(id)).promise;
   };
 
+  IDB.waitAll = waitAll;
+
   IDB.prototype = {
     prom: prom,
 
@@ -202,37 +210,54 @@ define(['prim'], function (prim) {
     put: function (value, key, storeName) {
       return this.tx('readwrite', function (store) {
         return prom(store.put(value, key));
-      }, storeName);
+      }, storeName).then(function (v) {
+        this.emit('put', value, key, storeName);
+        return v;
+      }.bind(this));
     },
 
-    // Pass an array of [value, key] arrays.
-    putBulk: function (valKeyAry, storeName) {
+    // Pass an array of values for valAry
+    putBulk: function (valAry, storeName) {
       return this.tx('readwrite', function (store) {
-        return waitAll(valKeyAry.map(function (valKey) {
-          return prom(store.put(valKey[0], valKey[1]));
+        return waitAll(valAry.map(function (val) {
+          return prom(store.put(val));
         }));
-      }, storeName);
+      }, storeName).then(function (v) {
+        this.emit('put', valAry, storeName);
+        return v;
+      }.bind(this));
     },
 
     add: function (value, key, storeName) {
       return this.tx('readwrite', function (store) {
         return prom(store.add(value, key));
-      }, storeName);
+      }, storeName).then(function (v) {
+        this.emit('add', value, key, storeName);
+        return v;
+      }.bind(this));
     },
 
-    // Pass an array of [value, key] arrays.
-    addBulk: function (valKeyAry, storeName) {
+    // Pass an array of values for valAry
+    addBulk: function (valAry, storeName) {
+      console.log('Start addBulk: ', valAry);
       return this.tx('readwrite', function (store) {
-        return waitAll(valKeyAry.map(function (valKey) {
-          return prom(store.add(valKey[0], valKey[1]));
+        return waitAll(valAry.map(function (val) {
+          console.log('addBulk: ', val);
+          return prom(store.add(val));
         }));
-      }, storeName);
+      }, storeName).then(function (v) {
+        this.emit('add', valAry, storeName);
+        return v;
+      }.bind(this));
     },
 
     del: function (key, storeName) {
       return this.tx('readwrite', function (store) {
         return prom(store['delete'](key));
-      }, storeName);
+      }, storeName).then(function (v) {
+        this.emit('del', key, storeName);
+        return v;
+      }.bind(this));
     },
 
     // Pass an array of keys.
@@ -241,7 +266,19 @@ define(['prim'], function (prim) {
         return waitAll(keys.map(function (key) {
           return prom(store.put(key));
         }));
-      }, storeName);
+      }, storeName).then(function (v) {
+        this.emit('del', keys, storeName);
+        return v;
+      }.bind(this));
+    },
+
+    clear: function (storeName) {
+      return this.tx('readwrite', function (store) {
+        return prom(store.clear());
+      }, storeName).then(function (v) {
+        this.emit('clear', storeName);
+        return v;
+      }.bind(this));
     },
 
     get: function (key, storeName) {
@@ -250,15 +287,9 @@ define(['prim'], function (prim) {
       }, storeName);
     },
 
-    clear: function (storeName) {
-      return this.tx('readwrite', function (store) {
-        return prom(store.clear());
-      }, storeName);
-    },
-
     count: function (key, storeName) {
       return this.tx('readonly', function (store) {
-        return prom(store.count(key));
+        return prom(key ? store.count() : store.count(key));
       }, storeName);
     },
 
