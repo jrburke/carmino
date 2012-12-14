@@ -1,5 +1,5 @@
 define(function (require) {
-  var feeds = require('./model/feeds'),
+  var entriesDb = require('./model/readerDb!entries'),
       tmpl = require('tmpl!./detail.html');
 
   function detail(deck, data) {

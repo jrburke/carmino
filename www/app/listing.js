@@ -1,12 +1,9 @@
 define(function (require) {
-  var entries = require('./model/entries'),
+  var entriesDb = require('./model/readerDb!entries'),
       tmpl = require('tmpl!./listing.html');
 
   function listing(deck) {
-    entries.then(function (entriesIDB) {
-      return entriesIDB.all();
-    }).then(function (entries) {
-
+    entriesDb.all().then(function (entries) {
       //Add some URI-encoded value for the urls
       if (entries) {
         entries = entries.map(function (entry) {
