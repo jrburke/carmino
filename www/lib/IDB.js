@@ -239,10 +239,8 @@ define(['prim', 'events'], function (prim, events) {
 
     // Pass an array of values for valAry
     addBulk: function (valAry, storeName) {
-      console.log('Start addBulk: ', valAry);
       return this.tx('readwrite', function (store) {
         return waitAll(valAry.map(function (val) {
-          console.log('addBulk: ', val);
           return prom(store.add(val));
         }));
       }, storeName).then(function (v) {

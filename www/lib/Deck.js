@@ -1,3 +1,4 @@
+/*global console */
 define(function (require, exports, module) {
   var tempDeck, html, deckNode,
       prim = require('prim'),
@@ -208,6 +209,33 @@ define(function (require, exports, module) {
     deckNode = null;
   };
 
+  Deck.persistHtml = function () {
+    // Do not block anything going on in the UI, wait until after
+    // the animation is probably done.
+    setTimeout(function () {
+      localStorage.setItem(storageHtmlId, document.body.innerHTML);
+    }, 500);
+  };
+
+  Deck.updateCards = function (moduleId, cardFn) {
+    var hasError;
+
+    slice(document.querySelectorAll('[data-moduleid="' +
+                 moduleId +
+                 '"]')).forEach(function (cardNode) {
+      try {
+        cardFn(cardNode);
+      } catch (e) {
+        hasError = true;
+        console.error(e);
+      }
+    });
+
+    if (!hasError) {
+      Deck.persistHtml();
+    }
+  };
+
   Deck.prototype = {
     destroy: function () {
       Object.keys(this.handlers).forEach(function (evtName) {
@@ -329,11 +357,7 @@ define(function (require, exports, module) {
 
       location.replace('#' + href);
 
-      // Do not block anything going on in the UI, wait until after
-      // the animation is probably done.
-      setTimeout(function () {
-        localStorage.setItem(storageHtmlId, document.body.innerHTML);
-      }, 500);
+      Deck.persistHtml();
     },
 
     nav: function (cardIndex, options) {
