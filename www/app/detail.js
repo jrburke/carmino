@@ -3,9 +3,9 @@ define(function (require) {
       tmpl = require('tmpl!./detail.html');
 
   function detail(deck, data) {
-    feeds.detail(data.author, data.id).then(function (feedData) {
+    entriesDb.get(data.id).then(function (data) {
 
-      var card = deck.card(feedData.feed.title, tmpl(feedData.entry), {
+      var card = deck.card(data.author, tmpl(data), {
         back: true
       });
 

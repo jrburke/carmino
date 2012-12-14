@@ -8,8 +8,7 @@ define(function (require) {
       if (entries) {
         entries = entries.map(function (entry) {
           entry = Object.create(entry);
-          entry.linkEncoded = 'author=' + encodeURIComponent(entry.feedUrl) +
-                              '&id=' + encodeURIComponent(entry.link);
+          entry.linkEncoded = 'id=' + encodeURIComponent(entry.link);
           return entry;
         });
       }
