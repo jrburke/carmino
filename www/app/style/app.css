@@ -26,6 +26,8 @@ html {
 
 div.content {
   padding: 0 1em;
+  overflow-x: hidden;
+  overflow-y: auto;
 }
 
 .card.skin-organic {

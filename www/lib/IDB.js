@@ -1,8 +1,7 @@
 /*global console */
 
-define(['prim', 'events'], function (prim, events) {
+define(['indexedDB!', 'prim', 'events'], function (api, prim, events) {
   var allKeyProp,
-      api = window.indexedDB || window.webkitIndexedDB || window.msIndexedDB,
       dbEvents = ['onabort', 'onerror', 'onversionchange'];
 
   allKeyProp = {
