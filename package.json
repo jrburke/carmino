@@ -2,5 +2,8 @@
   "amd": {},
   "volo": {
     "baseUrl": "www/lib"
+  },
+  "dependencies": {
+    "volo-appcache": "0.0.1"
   }
 }

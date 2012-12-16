@@ -1,0 +1,20 @@
+/*jslint node: true, regexp: true */
+'use strict';
+
+var crypto = require('crypto'),
+    fs = require('fs'),
+    path = require('path'),
+    buildDir = 'www-built';
+
+module.exports = {
+    //Builds the JS and CSS into one file each. If you want to do
+    //dynamic loading of scripts, pass -dynamic to the build, and
+    //require.js will be used to load scripts.
+    build: 'node tools/r.js -o tools/build.js',
+
+    //Runs the build, and generates the appcache manifest
+    appcache: require('volo-appcache')({
+        depends: ['build'],
+        dir: buildDir
+    })
+};

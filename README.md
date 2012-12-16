@@ -4,7 +4,9 @@
 
 TODO
 * rehydrate w/ multiple "center" tags
-* generate appcache
+* for build, only keep lib/shared parts that are used. Need to scan the
+  generated CSS for used urls and just keep them, but delete the rest.
+  Makes the appcache smaller.
 
 Build web apps targeted for mobile apps using a card metaphor. Each
 screen is a card. Navigation is done by slide cards horizontally.
