@@ -6,7 +6,10 @@ define(function () {
     '  <button> Action 3 </button>' +
     '  <button>  Cancel  </button>' +
     '<div class="bottom-toolbar"><button data-href="#app/settings" class="settings bottom-btn"></button></div>', {
-      cardClass: 'skin-organic menu'
+      cardClass: 'skin-organic menu',
+      toolbar: deck.hasWebKitCalcBug ? {
+        '#!back': 'Done'
+      } : {}
     }));
   }
 

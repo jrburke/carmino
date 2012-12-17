@@ -1,6 +1,6 @@
 /*global console */
 define(function (require, exports, module) {
-  var tempDeck, html, deckNode,
+  var tempDeck, html, deckNode, hasWebKitCalcBug,
       prim = require('prim'),
       registry = {},
       tempNode = document.createElement('div'),
@@ -12,9 +12,8 @@ define(function (require, exports, module) {
 
   // Hack for webkit browsers
   // https://bugs.webkit.org/show_bug.cgi?id=104390
-  if ('webkitTransform' in document.body.style) {
-    document.body.classList.add('webkit');
-  }
+  hasWebKitCalcBug = 'webkitTransform' in document.body.style;
+  document.body.classList.add(hasWebKitCalcBug ? 'webkit' : 'nowebkit');
 
   function reset() {
     localStorage.setItem(storageVersionId, version);
@@ -187,6 +186,8 @@ define(function (require, exports, module) {
   // Expose reset, so that a developer could do a state reset in
   // the console via require('Deck').reset();
   Deck.reset = reset;
+
+  Deck.hasWebKitCalcBug = hasWebKitCalcBug;
 
   Deck.registry = registry;
 
@@ -498,6 +499,7 @@ define(function (require, exports, module) {
 
     makeLocalDeck: function (href, moduleId) {
       return {
+        hasWebKitCalcBug: hasWebKitCalcBug,
         create: this.create.bind(this, href, moduleId),
         card: this.card.bind(this),
         before: this.before.bind(this, href, moduleId),

@@ -84,16 +84,12 @@ to get the shared styles to show up */
   overflow-y: auto;
 }
 
-.card.menu {
+.nowebkit .card.menu {
   width: -webkit-calc(100% - 4.3em);
   width: calc(100% - 4.3em);
 }
 
-.card.center.menu + .card.after {
+.nowebkit .card.center.menu + .card.after {
   transform: translateX(-webkit-calc(100% - 4.3em));
   transform: translateX(calc(100% - 4.3em));
-}
-
-.webkit .card.center.menu + .card.after {
-  left: -webkit-calc(100% - 4.3em);
 }
