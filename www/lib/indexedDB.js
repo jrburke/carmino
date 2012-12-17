@@ -3,6 +3,7 @@ define({
     // Just ignore for builds.
     if (config.isBuild) {
       load();
+      return;
     }
 
     var indexedDb = window.indexedDB || window.webkitIndexedDB || window.msIndexedDB;
