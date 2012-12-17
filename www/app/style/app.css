@@ -24,6 +24,10 @@ html {
   font-family: 'MozTT',sans-serif;
 }
 
+header h1 {
+  float: left;
+}
+
 div.content {
   padding: 0 1em;
   overflow-x: hidden;
