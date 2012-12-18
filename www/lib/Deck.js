@@ -178,6 +178,11 @@ define(function (require, exports, module) {
     addEvent(this.node, transitionEventName, this, '_onTransitionEnd');
     addEvent(this.node, 'click', this, '_onClick');
 
+    addEvent(this.node, 'touchstart', this, '_onTouchStart');
+    addEvent(this.node, 'touchmove', this, '_onTouchMove');
+    addEvent(this.node, 'touchcancel', this, '_onTouchCancel');
+    addEvent(this.node, 'touchend', this, '_onTouchEnd');
+
     if (restored) {
       this.notify('onShow', this.cards[this.index]);
     }
@@ -516,9 +521,39 @@ define(function (require, exports, module) {
       }
     },
 
+    _onTouchStart: function (evt) {
+      Deck.usingTouch = true;
+      var touches = evt.touches;
+
+      if (touches.length === 1) {
+        this.storedTouch = touches[0];
+      }
+    },
+
+    _onTouchMove: function (evt) {
+      var touches = evt.touches;
+
+      if (this.storedTouch && (touches.length !== 1 ||
+          touches[0].clientX !== this.storedTouch.clientX ||
+          touches[0].clientY !== this.storedTouch.clientY)) {
+        this.storedTouch = null;
+      }
+    },
+
+    _onTouchCancel: function () {
+      this.storedTouch = null;
+    },
+
+    _onTouchEnd: function (evt) {
+      var touches = evt.changedTouches;
+      if (this.storedTouch && touches.length === 1 && touches[0].target === this.storedTouch.target) {
+        this.storedTouch = null;
+        this._onClick(evt);
+      }
+    },
+
     _onClick: function (evt) {
-      if (this._animating) {
-        // Just kill the event, wait until animation is done to do new clicks.
+      if (this._animating || Deck.usingTouch && evt.type !== 'touchend') {
         stopEvent(evt);
         return;
       }
