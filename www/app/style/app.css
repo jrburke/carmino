@@ -30,6 +30,7 @@ header h1 {
 
 div.content {
   padding: 0 1em;
+  width: 100%;
   overflow-x: hidden;
   overflow-y: auto;
 }
@@ -92,3 +93,6 @@ div.content {
   background: url('images/icons/settings.png') no-repeat scroll center transparent;
 }
 
+.card[data-moduleid="app/settings"] .content {
+  background: white;
+}

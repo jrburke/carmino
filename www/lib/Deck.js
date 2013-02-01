@@ -36,6 +36,23 @@ define(function (require, exports, module) {
     return [].slice.call(aryLike, 0);
   }
 
+  function walkUpForCardModule(node) {
+    // Walk up from starting node to find the node and module ID that includes
+    // starting node.
+    var moduleId;
+
+    while (node) {
+      moduleId = node.getAttribute('data-moduleid');
+      if (moduleId) {
+        return {
+          node: node,
+          id: moduleId
+        };
+      }
+      node = node.parentNode;
+    }
+  }
+
   function hasClass(node, name) {
     return node && node.classList.contains(name);
   }
@@ -191,6 +208,8 @@ define(function (require, exports, module) {
     addEvent(this.node, 'touchmove', this, '_onTouchMove');
     addEvent(this.node, 'touchcancel', this, '_onTouchCancel');
     addEvent(this.node, 'touchend', this, '_onTouchEnd');
+
+    addEvent(this.node, 'keypress', this, '_onKeyPress');
 
     if (restored) {
       this.notify('onShow', this.cards[this.index]);
@@ -420,7 +439,6 @@ define(function (require, exports, module) {
                   this.node.insertBefore(node, endNode);
                   endNode.parentNode.removeChild(endNode);
                   endNode = this.cards[cardIndex] = node;
-console.log('DONE');
                 }
               }.bind(this)).then(d.resolve, d.reject);
             } else {
@@ -435,7 +453,7 @@ console.log('DONE');
         if (isForward && hasClass(endNode, 'anim-overlay')) {
           beginNode = null;
         }
-console.log('start transition');
+
         // Trim out dead nodes, ones that are considered "forward" in the
         // navigation, even though that could happen from either the left
         // or right side of the current card.
@@ -631,6 +649,26 @@ console.log('start transition');
         }
 
         stopEvent(evt);
+      }
+    },
+
+    _onKeyPress: function (evt) {
+      var modData,
+          target = evt.target,
+          fn = target.getAttribute('data-fn');
+
+      if (fn) {
+        evt.stopPropagation();
+
+        modData = walkUpForCardModule(target);
+
+        if (modData) {
+          require([modData.id], function (mod) {
+            if (mod[fn]) {
+              mod[fn](modData.node, evt);
+            }
+          });
+        }
       }
     },
 

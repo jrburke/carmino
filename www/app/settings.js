@@ -1,11 +1,20 @@
-define(function () {
-  function settings(deck, data) {
-    var d, card;
+/*global console */
 
-    card = deck.card('Settings',
-      '  <button data-href="#app/next"> Setting 1 </button>' +
-      '  <button onclick="appReset();"> RESET </button>' +
-      '<div class="bottom-toolbar"></div>', {
+define(function (require) {
+  var searchValue, searchTimeoutId;
+
+  function clearSearchTimeout() {
+    if (searchTimeoutId) {
+      clearTimeout(searchTimeoutId);
+      searchTimeoutId = 0;
+    }
+  }
+
+  function settings(deck, data) {
+    var d, card,
+        tmpl = require('tmpl!./settings.html');
+
+    card = deck.card('Settings', tmpl({}), {
         cardClass: 'skin-organic',
         toolbar: {
           '#!back': 'Done'
@@ -25,11 +34,26 @@ define(function () {
   };
 
   settings.onHide = function (node, deck) {
+    clearSearchTimeout();
     console.log('settings onHide called: ', node);
   };
 
   settings.onDestroy = function (node, deck) {
+    clearSearchTimeout();
     console.log('settings onDestroy called: ', node);
   };
+
+  // Event handlers
+  settings.searchKeyPress = function (node, evt) {
+    searchValue = evt.target.value;
+
+    if (!searchTimeoutId) {
+      searchTimeoutId = setTimeout(function () {
+        searchTimeoutId = 0;
+        node.querySelector('.search-results').innerHTML = searchValue;
+      }, 300);
+    }
+  };
+
   return settings;
 });
