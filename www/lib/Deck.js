@@ -408,7 +408,7 @@ define(function (require, exports, module) {
           d = prim();
           require([moduleId], function (mod) {
             if (mod.update) {
-              d.resolve(prim().start(function () {
+              prim().start(function () {
                 return mod.update({
                   card: this.card.bind(this)
                 }, endNode, updateData.data);
@@ -422,7 +422,7 @@ define(function (require, exports, module) {
                   endNode = this.cards[cardIndex] = node;
 console.log('DONE');
                 }
-              }.bind(this)));
+              }.bind(this)).then(d.resolve, d.reject);
             } else {
               d.resolve();
             }
@@ -526,7 +526,8 @@ console.log('start transition');
       if (link && link.secondaryTarget) {
         options = {
           update: {
-            href: link.href,
+            //Trim the primary target from href, since already handled
+            href: link.href.substring(link.href.indexOf(':') + 1),
             target: link.secondaryTarget,
             data: link.data
           }

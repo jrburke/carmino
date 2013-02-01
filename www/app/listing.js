@@ -65,7 +65,7 @@ define(function (require, exports, module) {
     }
 
     return promise.then(function (records) {
-      return generateCard(deck, 'Posts', records);
+      return generateCard(deck, title, records);
     }).fail(function (err) {
       console.error(err);
     });
