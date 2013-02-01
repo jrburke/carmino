@@ -4,7 +4,7 @@ define(function () {
 
     card = deck.card('Settings',
       '  <button data-href="#app/next"> Setting 1 </button>' +
-      '  <button onclick="require(\'Deck\').reset();require(\'IDB\').deleteDatabase(\'reader\');location.reload(true);"> RESET </button>' +
+      '  <button onclick="appReset();"> RESET </button>' +
       '<div class="bottom-toolbar"></div>', {
         cardClass: 'skin-organic',
         toolbar: {

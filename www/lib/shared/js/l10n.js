@@ -33,12 +33,16 @@
 
   /**
    * Debug helpers
+   *
+   *   gDEBUG == 0: don't display any console message
+   *   gDEBUG == 1: display only warnings, not logs
+   *   gDEBUG == 2: display all console messages
    */
 
-  var gDEBUG = false;
+  var gDEBUG = 1;
 
   function consoleLog(message) {
-    if (gDEBUG) {
+    if (gDEBUG >= 2) {
       console.log('[l10n] ' + message);
     }
   };
@@ -59,6 +63,12 @@
 
   function getL10nResourceLinks() {
     return document.querySelectorAll('link[type="application/l10n"]');
+  }
+
+  function getL10nDictionary() {
+    var script = document.querySelector('script[type="application/l10n"]');
+    // TODO: support multiple and external JSON dictionaries
+    return script ? JSON.parse(script.innerHTML) : null;
   }
 
   function getTranslatableChildren(element) {
@@ -82,10 +92,10 @@
     return { id: l10nId, args: args };
   }
 
-  function fireL10nReadyEvent(lang) {
+  function fireL10nReadyEvent() {
     var evtObject = document.createEvent('Event');
     evtObject.initEvent('localized', false, false);
-    evtObject.language = lang;
+    evtObject.language = gLanguage;
     window.dispatchEvent(evtObject);
   }
 
@@ -187,7 +197,7 @@
       function loadImport(url) {
         loadResource(url, function(content) {
           parseRawLines(content, false); // don't allow recursive imports
-        }, false, false); // load synchronously
+        }, null, false); // load synchronously
       }
 
       // fill the dictionary
@@ -197,6 +207,11 @@
 
     // load the specified resource file
     function loadResource(url, onSuccess, onFailure, asynchronous) {
+      onSuccess = onSuccess || function _onSuccess(data) {};
+      onFailure = onFailure || function _onFailure() {
+        consoleWarn(url + ' not found.');
+      };
+
       var xhr = new XMLHttpRequest();
       xhr.open('GET', url, asynchronous);
       if (xhr.overrideMimeType) {
@@ -205,17 +220,22 @@
       xhr.onreadystatechange = function() {
         if (xhr.readyState == 4) {
           if (xhr.status == 200 || xhr.status === 0) {
-            if (onSuccess) {
-              onSuccess(xhr.responseText);
-            }
+            onSuccess(xhr.responseText);
           } else {
-            if (onFailure) {
-              onFailure();
-            }
+            onFailure();
           }
         }
       };
-      xhr.send(null);
+      xhr.onerror = onFailure;
+      xhr.ontimeout = onFailure;
+
+      // in Firefox OS with the app:// protocol, trying to XHR a non-existing
+      // URL will raise an exception here -- hence this ugly try...catch.
+      try {
+        xhr.send(null);
+      } catch (e) {
+        onFailure();
+      }
     }
 
     // load and parse l10n data (warning: global variables are used here)
@@ -248,6 +268,8 @@
 
   // load and parse all resources for the specified locale
   function loadLocale(lang, callback) {
+    callback = callback || function _callback() {};
+
     clear();
     gLanguage = lang;
 
@@ -256,7 +278,16 @@
     var langLinks = getL10nResourceLinks();
     var langCount = langLinks.length;
     if (langCount == 0) {
-      consoleLog('no resource to load, early way out');
+      // we might have a pre-compiled dictionary instead
+      var dict = getL10nDictionary();
+      if (dict && dict.locales && dict.default_locale) {
+        consoleLog('using the embedded JSON directory, early way out');
+        gL10nData = dict.locales[lang] || dict.locales[dict.default_locale];
+        callback();
+      } else {
+        consoleLog('no resource to load, early way out');
+      }
+      // early way out
       fireL10nReadyEvent(lang);
       gReadyState = 'complete';
       return;
@@ -268,9 +299,7 @@
     onResourceLoaded = function() {
       gResourceCount++;
       if (gResourceCount >= langCount) {
-        if (callback) { // execute the [optional] callback
-          callback();
-        }
+        callback();
         fireL10nReadyEvent(lang);
         gReadyState = 'complete';
       }
@@ -761,9 +790,7 @@
   function getL10nData(key, args) {
     var data = gL10nData[key];
     if (!data) {
-      //consoleWarn('#' + key + ' missing for [' + gLanguage + ']');
-      // XXX temporary log, to be removed after the string freeze
-      consoleWarn('[l10n] #' + key + ' is undefined.');
+      consoleWarn('#' + key + ' is undefined.');
     }
 
     /** This is where l10n expressions should be processed.
@@ -775,7 +802,7 @@
     for (var prop in data) {
       var str = data[prop];
       str = substIndexes(str, args, key, prop);
-      str = substArguments(str, args);
+      str = substArguments(str, args, key);
       rv[prop] = str;
     }
     return rv;
@@ -808,8 +835,8 @@
   }
 
   // replace {{arguments}} with their values
-  function substArguments(str, args) {
-    var reArgs = /\{\{\s*([a-zA-Z\.]+)\s*\}\}/;
+  function substArguments(str, args, key) {
+    var reArgs = /\{\{\s*(.+?)\s*\}\}/;
     var match = reArgs.exec(str);
     while (match) {
       if (!match || match.length < 2)
@@ -822,7 +849,7 @@
       } else if (arg in gL10nData) {
         sub = gL10nData[arg][gTextProp];
       } else {
-        consoleWarn('could not find argument {{' + arg + '}}');
+        consoleLog('argument {{' + arg + '}} for #' + key + ' is undefined.');
         return str;
       }
 
@@ -836,31 +863,28 @@
   // translate an HTML element
   function translateElement(element) {
     var l10n = getL10nAttributes(element);
-    if (!l10n.id)
-      return;
+    if (!l10n.id) {
+        return;
+    }
 
     // get the related l10n object
     var data = getL10nData(l10n.id, l10n.args);
     if (!data) {
-      //consoleWarn('#' + l10n.id + ' missing for [' + gLanguage + ']');
-      // XXX temporary log, to be removed after the string freeze
-      consoleWarn('[l10n] #' + l10n.id + ' is undefined.');
+      consoleWarn('#' + l10n.id + ' is undefined.');
       return;
     }
 
     // translate element (TODO: security checks?)
-    // for the node content, replace the content of the first child textNode
-    // and clear other child textNodes
     if (data[gTextProp]) { // XXX
       if (element.children.length === 0) {
         element[gTextProp] = data[gTextProp];
       } else {
-        var children = element.childNodes,
-            found = false;
+        // this element has element children: replace the content of the first
+        // (non-empty) child textNode and clear other child textNodes
+        var children = element.childNodes;
+        var found = false;
         for (var i = 0, l = children.length; i < l; i++) {
-          if (children[i].nodeType === 3 &&
-              /\S/.test(children[i].textContent)) { // XXX
-            // using nodeValue seems cross-browser
+          if (children[i].nodeType === 3 && /\S/.test(children[i].nodeValue)) {
             if (found) {
               children[i].nodeValue = '';
             } else {
@@ -869,8 +893,11 @@
             }
           }
         }
+        // if no (non-empty) textNode is found, insert a textNode before the
+        // first element child.
         if (!found) {
-          consoleWarn('unexpected error, could not translate element content');
+          var textNode = document.createTextNode(data[gTextProp]);
+          element.insertBefore(textNode, element.firstChild);
         }
       }
       delete data[gTextProp];
@@ -899,15 +926,34 @@
 
   /**
    * Startup & Public API
+   *
+   * This section is quite specific to the B2G project: old browsers are not
+   * supported and the API is slightly different from the standard webl10n one.
    */
 
   // load the default locale on startup
-  window.addEventListener('DOMContentLoaded', function l10nStartup() {
+  function l10nStartup() {
     gReadyState = 'interactive';
     consoleLog('loading [' + navigator.language + '] resources, ' +
         (gAsyncResourceLoading ? 'asynchronously.' : 'synchronously.'));
-    loadLocale(navigator.language, translateFragment);
-  });
+
+    // load the default locale and translate the document if required
+    if (document.documentElement.lang === navigator.language) {
+      loadLocale(navigator.language, fireL10nReadyEvent);
+    } else {
+      loadLocale(navigator.language, translateFragment);
+    }
+  }
+
+  // the B2G build system doesn't expose any `document'...
+  if (typeof(document) !== 'undefined') {
+    if (document.readyState === 'interactive' ||
+        document.readyState === 'complete') {
+      l10nStartup();
+    } else {
+      document.addEventListener('DOMContentLoaded', l10nStartup);
+    }
+  }
 
   // load the appropriate locale if the language setting has changed
   if ('mozSettings' in navigator && navigator.mozSettings) {
@@ -916,7 +962,7 @@
     });
   }
 
-  // Public API
+  // public API
   navigator.mozL10n = {
     // get a localized string
     get: function l10n_get(key, args, fallback) {
@@ -947,7 +993,10 @@
     // translate an element or document fragment
     translate: translateFragment,
 
-    // this can be used to avoid race conditions
+    // get (a clone of) the dictionary for the current locale
+    get dictionary() { return JSON.parse(JSON.stringify(gL10nData)); },
+
+    // this can be used to prevent race conditions
     get readyState() { return gReadyState; }
   };
 

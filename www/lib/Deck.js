@@ -104,6 +104,15 @@ define(function (require, exports, module) {
           });
         }
       }
+
+      //Split the target into two pieces, if it is a special command
+      if (result.target) {
+        index = result.target.indexOf(':');
+        if (index !== -1) {
+          result.secondaryTarget = result.target.substring(index + 1);
+          result.target = result.target.substring(0, index);
+        }
+      }
     }
 
     return result;
@@ -381,115 +390,164 @@ define(function (require, exports, module) {
       }
 
       var temp,
+          updateData = options.update,
           finalIndex = cardIndex,
           beginNode = this.cards[this.index],
           endNode = this.cards[cardIndex],
           isForward = options.direction === 'forward';
 
-      // If going forward and it is an overlay node, then do not animate the
-      // beginning node, it will just sit under the overlay.
-      if (isForward && hasClass(endNode, 'anim-overlay')) {
-        beginNode = null;
-      }
 
-      // Trim out dead nodes, ones that are considered "forward" in the
-      // navigation, even though that could happen from either the left
-      // or right side of the current card.
-      if (!isForward) {
-        if (cardIndex < this.index) {
-          // Trim nodes from the "right"
-          this._deadNodes = this.cards.splice(cardIndex + 1,
-                                            this.cards.length - cardIndex);
-        } else {
-          // Trim nodes from the "left"
-          this._deadNodes = this.cards.splice(0, cardIndex);
-          finalIndex = 0;
+      prim().start(function () {
+        // If an update to the endNode is requested before doing the transition,
+        // load up module responsible for endNode and ask for an update.
+        var d,
+            moduleId = updateData && updateData.target;
+
+        if (moduleId && endNode &&
+            endNode.getAttribute('data-moduleid') === moduleId) {
+          d = prim();
+          require([moduleId], function (mod) {
+            if (mod.update) {
+              d.resolve(prim().start(function () {
+                return mod.update({
+                  card: this.card.bind(this)
+                }, endNode, updateData.data);
+              }.bind(this)).then(function (cardHtml) {
+                if (cardHtml) {
+                  //Replace the node
+                  var node = this.toCardNode(cardHtml, updateData.href, moduleId);
+                  node.className = endNode.className;
+                  this.node.insertBefore(node, endNode);
+                  endNode.parentNode.removeChild(endNode);
+                  endNode = this.cards[cardIndex] = node;
+console.log('DONE');
+                }
+              }.bind(this)));
+            } else {
+              d.resolve();
+            }
+          }.bind(this), d.reject);
+          return d.promise;
         }
-      }
-
-      // If going back and the beginning node was an overlay, do not animate
-      // the end node, since it should just be hidden under the overlay.
-      if (beginNode && hasClass(beginNode, 'anim-overlay')) {
-        if (isForward) {
-          // If a forward animation and overlay had a vertical transition,
-          // disable it, use normal horizontal transition.
-          if (!options.immediate && hasClass(beginNode, 'anim-vertical')) {
-            removeClass(beginNode, 'anim-vertical');
-            addClass(beginNode, 'disabled-anim-vertical');
+      }.bind(this)).then(function () {
+        // If going forward and it is an overlay node, then do not animate the
+        // beginning node, it will just sit under the overlay.
+        if (isForward && hasClass(endNode, 'anim-overlay')) {
+          beginNode = null;
+        }
+console.log('start transition');
+        // Trim out dead nodes, ones that are considered "forward" in the
+        // navigation, even though that could happen from either the left
+        // or right side of the current card.
+        if (!isForward) {
+          if (cardIndex < this.index) {
+            // Trim nodes from the "right"
+            this._deadNodes = this.cards.splice(cardIndex + 1,
+                                              this.cards.length - cardIndex);
+          } else {
+            // Trim nodes from the "left"
+            this._deadNodes = this.cards.splice(0, cardIndex);
+            finalIndex = 0;
           }
-        } else {
-          endNode = null;
         }
-      }
 
-      if (options.immediate) {
-        addClass(beginNode, 'no-anim');
-        addClass(endNode, 'no-anim');
-      }
+        // If going back and the beginning node was an overlay, do not animate
+        // the end node, since it should just be hidden under the overlay.
+        if (beginNode && hasClass(beginNode, 'anim-overlay')) {
+          if (isForward) {
+            // If a forward animation and overlay had a vertical transition,
+            // disable it, use normal horizontal transition.
+            if (!options.immediate && hasClass(beginNode, 'anim-vertical')) {
+              removeClass(beginNode, 'anim-vertical');
+              addClass(beginNode, 'disabled-anim-vertical');
+            }
+          } else {
+            endNode = null;
+          }
+        }
 
-      this._transitionCount = (beginNode && endNode && !options.immediate) ? 2 : 1;
-      this._animating = true;
+        if (options.immediate) {
+          addClass(beginNode, 'no-anim');
+          addClass(endNode, 'no-anim');
+        }
 
-      // make sure the reflow sees the correct transition state, whether
-      // it is on or off. Otherwise, forward navigation in Firefox
-      // did not seem to know animation was involved.
-      temp = this.node.clientWidth;
+        this._transitionCount = (beginNode && endNode && !options.immediate) ? 2 : 1;
+        this._animating = true;
 
-      if (this.index === cardIndex) {
-        // same node, no transition, just bootstrapping UI.
-        removeClass(beginNode, 'before');
-        removeClass(beginNode, 'after');
-        addClass(beginNode, 'center');
-      } else if (this.index > cardIndex) {
-        // back
-        removeClass(beginNode, 'center');
-        addClass(beginNode, 'after');
-
-        removeClass(endNode, 'before');
-        addClass(endNode, 'center');
-      } else {
-        // forward
-        removeClass(beginNode, 'center');
-        addClass(beginNode, 'before');
-
-        removeClass(endNode, 'after');
-        addClass(endNode, 'center');
-      }
-
-      this._beginNode = beginNode;
-      this._endNode = endNode;
-      this._endNodeEvent = isForward ? null : 'onShow';
-
-      this.index = finalIndex;
-
-      if (options.immediate) {
-        // make sure the instantaneous transition is seen before we turn
-        // transitions back on.
+        // make sure the reflow sees the correct transition state, whether
+        // it is on or off. Otherwise, forward navigation in Firefox
+        // did not seem to know animation was involved.
         temp = this.node.clientWidth;
 
-        removeClass(beginNode, 'no-anim');
-        removeClass(endNode, 'no-anim');
+        if (this.index === cardIndex) {
+          // same node, no transition, just bootstrapping UI.
+          removeClass(beginNode, 'before');
+          removeClass(beginNode, 'after');
+          addClass(beginNode, 'center');
+        } else if (this.index > cardIndex) {
+          // back
+          removeClass(beginNode, 'center');
+          addClass(beginNode, 'after');
 
-        // Manually call transition end to finish up any common work.
-        this._onTransitionEnd();
-      }
+          removeClass(endNode, 'before');
+          addClass(endNode, 'center');
+        } else {
+          // forward
+          removeClass(beginNode, 'center');
+          addClass(beginNode, 'before');
+
+          removeClass(endNode, 'after');
+          addClass(endNode, 'center');
+        }
+
+        this._beginNode = beginNode;
+        this._endNode = endNode;
+        this._endNodeEvent = isForward ? null : 'onShow';
+
+        this.index = finalIndex;
+
+        if (options.immediate) {
+          // make sure the instantaneous transition is seen before we turn
+          // transitions back on.
+          temp = this.node.clientWidth;
+
+          removeClass(beginNode, 'no-anim');
+          removeClass(endNode, 'no-anim');
+
+          // Manually call transition end to finish up any common work.
+          this._onTransitionEnd();
+        }
+      }.bind(this)).end();
     },
 
-    back: function () {
+    back: function (link) {
+      var options;
+
+      if (link && link.secondaryTarget) {
+        options = {
+          update: {
+            href: link.href,
+            target: link.secondaryTarget,
+            data: link.data
+          }
+        };
+      }
+
       if (this.index === 0) {
         if (this.cards.length === 1 && this.parent) {
-          this.parent.back();
+          this.parent.back(link);
         } else {
           // A "back" from a card that was added to the front of the queue,
           // like a settings screen.
-          this.nav(1);
+          this.nav(1, options);
         }
       } else {
-        this.nav(this.index - 1);
+        this.nav(this.index - 1, options);
       }
     },
 
-    menu: function (data) {
+    menu: function (link) {
+      var data = link.data;
       if (this.node.querySelector('.card.menu')) {
         // Go "back" to other card.
         this.nav(this.index + 1);
@@ -566,7 +624,7 @@ define(function (require, exports, module) {
         if (target.indexOf('!') === 0) {
           //Deck action
           target = target.substring(1);
-          this[target](link.data);
+          this[target](link);
         } else {
           this._navLink(link);
         }
