@@ -59,7 +59,8 @@ define(function (require, exports, module) {
     if (data && data.feedUrl) {
       // A feed pull
       title = data.title || 'Posts';
-      promise = entriesDb.index('feedUrl', 'all');
+      promise = entriesDb.index('feedUrlIndex', 'openCursor',
+                                [entriesDb.KeyRange.only(data.feedUrl)]);
     } else {
       promise = entriesDb.all();
     }

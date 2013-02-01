@@ -195,6 +195,8 @@ define(['indexedDB!', 'prim', 'events'], function (api, prim, events) {
   IDB.prototype = {
     prom: prom,
 
+    KeyRange: IDB.KeyRange,
+
     // Eventually passes the object store from a transaction in the given
     // mode: 'readonly', 'readwrite' or 'versionchange' to the function fn
     // fn(objectStore) should return a value, probably a promise or prom()
@@ -331,7 +333,7 @@ define(['indexedDB!', 'prim', 'events'], function (api, prim, events) {
             req = index[prop].apply(index, propArgs);
 
             if (prop === 'openCursor' || prop === 'openKeyCursor') {
-              return withCursor(req, cursorFn);
+              return withCursor(req, cursorFn || makeAllCursorFn());
             } else {
               return prom(req);
             }

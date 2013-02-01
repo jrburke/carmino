@@ -15,8 +15,8 @@ define(function (require) {
 
       var entryStore = db.createObjectStore('entries', { keyPath: 'link', autoIncrement: false });
 
-      entryStore.createIndex('feedUrl', 'feedUrl', { unique: false });
-      entryStore.createIndex('publishedTime', 'publishedTime', { unique: false });
+      entryStore.createIndex('feedUrlIndex', 'feedUrl', { unique: false, multiEntry: true });
+      entryStore.createIndex('publishedTimeIndex', 'publishedTime', { unique: false, multiEntry: true });
     }
   };
 
