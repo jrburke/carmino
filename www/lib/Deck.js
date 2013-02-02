@@ -643,7 +643,18 @@ define(function (require, exports, module) {
         if (target.indexOf('!') === 0) {
           //Deck action
           target = target.substring(1);
-          this[target](link);
+
+          if (target === 'fn' || target === 'fn-back') {
+            this.callFn(link.secondaryTarget, evt.target, evt, link.data)
+              .then(function () {
+                if (target === 'fn-back') {
+                  this.back();
+                }
+              }.bind(this)).end();
+
+          } else {
+            this[target](link);
+          }
         } else {
           this._navLink(link);
         }
@@ -652,23 +663,35 @@ define(function (require, exports, module) {
       }
     },
 
+    callFn: function (fn, target, evt) {
+      var d = prim(),
+          modData = walkUpForCardModule(target);
+
+      if (modData) {
+        require([modData.id], function (mod) {
+          if (mod[fn]) {
+            prim().start(function () {
+              return mod[fn](modData.node, evt);
+            }).then(d.resolve, d.reject);
+          } else {
+            d.resolve();
+          }
+        }, d.reject);
+      } else {
+        d.resolve();
+      }
+
+      return d.promise;
+    },
+
     _onKeyPress: function (evt) {
-      var modData,
-          target = evt.target,
+      var target = evt.target,
           fn = target.getAttribute('data-fn');
 
       if (fn) {
         evt.stopPropagation();
 
-        modData = walkUpForCardModule(target);
-
-        if (modData) {
-          require([modData.id], function (mod) {
-            if (mod[fn]) {
-              mod[fn](modData.node, evt);
-            }
-          });
-        }
+        this.callFn(fn, target, evt);
       }
     },
 

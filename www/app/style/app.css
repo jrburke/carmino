@@ -20,6 +20,11 @@ a {
   text-decoration: none;
 }
 
+a.external {
+  color: blue;
+  text-decoration: underline;
+}
+
 html {
   font-family: 'MozTT',sans-serif;
 }

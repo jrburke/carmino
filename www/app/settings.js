@@ -1,7 +1,10 @@
-/*global console */
+/*global console, appReset */
 
 define(function (require) {
-  var searchValue, searchTimeoutId;
+  var searchValue, searchTimeoutId,
+    tmpl = require('tmpl!./settings.html'),
+    resultsTmpl = require('tmpl!./settings-results.html'),
+    googleApi = require('./model/googleApi');
 
   function clearSearchTimeout() {
     if (searchTimeoutId) {
@@ -11,12 +14,12 @@ define(function (require) {
   }
 
   function settings(deck, data) {
-    var d, card,
-        tmpl = require('tmpl!./settings.html');
+    var d, card;
 
     card = deck.card('Settings', tmpl({}), {
         cardClass: 'skin-organic',
         toolbar: {
+          '#!fn:appReset': 'App Reset',
           '#!back': 'Done'
         }
       });
@@ -44,14 +47,30 @@ define(function (require) {
   };
 
   // Event handlers
+  settings.appReset = function (node, evt) {
+    appReset();
+  };
+
+  settings.addFeed = function (node, evt) {
+    var url = evt.target.getAttribute('data-url');
+    console.log('adding ')
+  };
+
   settings.searchKeyPress = function (node, evt) {
     searchValue = evt.target.value;
 
     if (!searchTimeoutId) {
       searchTimeoutId = setTimeout(function () {
         searchTimeoutId = 0;
-        node.querySelector('.search-results').innerHTML = searchValue;
-      }, 300);
+        var resultNode = node.querySelector('.search-results');
+        googleApi.find(searchValue).then(function (result) {
+          resultNode.innerHTML = resultsTmpl(result);
+        }, function (err) {
+          //An error with the API call, just clear the results.
+          console.log('ERROR: ', err);
+          resultNode.innerHTML = 'error';
+        });
+      }, 1000);
     }
   };
 
