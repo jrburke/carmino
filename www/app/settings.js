@@ -13,7 +13,7 @@ define(function (require) {
     }
   }
 
-  function settings(deck, data) {
+  function settings(deck) {
     var d, card;
 
     card = deck.card('Settings', tmpl({}), {
@@ -32,31 +32,44 @@ define(function (require) {
     deck.before(d);
   }
 
-  settings.onShow = function (node, deck) {
+  settings.onShow = function (node) {
     console.log('settings onShow called: ', node);
   };
 
-  settings.onHide = function (node, deck) {
+  settings.onHide = function (node) {
     clearSearchTimeout();
     console.log('settings onHide called: ', node);
   };
 
-  settings.onDestroy = function (node, deck) {
+  settings.onDestroy = function (node) {
     clearSearchTimeout();
     console.log('settings onDestroy called: ', node);
   };
 
   // Event handlers
-  settings.appReset = function (node, evt) {
+  settings.appReset = function () {
     appReset();
   };
 
-  settings.addFeed = function (node, evt) {
+  settings.askFeed = function (node, deck, data, evt) {
     var url = evt.target.getAttribute('data-url');
-    console.log('adding ')
+
+    deck.dialog({
+      title: 'Add feed?',
+      content: 'url',
+      ok: true,
+      cancel: true,
+      okHref: '!fn-back:addFeed?url=' + encodeURIComponent(url)
+    });
   };
 
-  settings.searchKeyPress = function (node, evt) {
+  settings.addFeed = function (node, deck, data) {
+    var url = data.url;
+
+    console.log(url);
+  };
+
+  settings.searchKeyPress = function (node, deck, data, evt) {
     searchValue = evt.target.value;
 
     if (!searchTimeoutId) {
