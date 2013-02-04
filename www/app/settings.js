@@ -1,7 +1,7 @@
 /*global console, appReset */
 
 define(function (require) {
-  var searchValue, searchTimeoutId,
+  var searchValue, lastSearchPromise, searchTimeoutId,
     tmpl = require('tmpl!./settings.html'),
     resultsTmpl = require('tmpl!./settings-results.html'),
     googleApi = require('./model/googleApi');
@@ -75,13 +75,30 @@ define(function (require) {
     if (!searchTimeoutId) {
       searchTimeoutId = setTimeout(function () {
         searchTimeoutId = 0;
-        var resultNode = node.querySelector('.search-results');
-        googleApi.find(searchValue).then(function (result) {
+        var localPromise = googleApi.find(searchValue),
+            resultNode = node.querySelector('.search-results');
+
+        // Make sure last
+        lastSearchPromise = localPromise;
+
+        lastSearchPromise.then(function (result) {
+          // Do not bother with the work if not the last search promise.
+          if (lastSearchPromise !== localPromise) {
+            return;
+          }
+
           resultNode.innerHTML = resultsTmpl(result);
+          lastSearchPromise = null;
         }, function (err) {
+          // Do not bother with the work if not the last search promise.
+          if (lastSearchPromise !== localPromise) {
+            return;
+          }
+
           //An error with the API call, just clear the results.
           console.log('ERROR: ', err);
           resultNode.innerHTML = 'error';
+          lastSearchPromise = null;
         });
       }, 1000);
     }
