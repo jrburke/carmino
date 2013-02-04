@@ -315,11 +315,13 @@ define(function (require, exports, module) {
       return node;
     },
 
-    dialog: function (data) {
+    dialog: function (href, moduleId, data) {
       var html,
           d = prim();
 
       data = Object.create(data || {});
+      data.moduleId = moduleId;
+
       if (data.cancel === true) {
         data.cancel = 'Cancel';
       }
@@ -614,7 +616,7 @@ define(function (require, exports, module) {
         hasWebKitCalcBug: hasWebKitCalcBug,
         create: this.create.bind(this, href, moduleId),
         card: this.card.bind(this),
-        dialog: this.dialog.bind(this),
+        dialog: this.dialog.bind(this, href, moduleId),
         before: this.before.bind(this, href, moduleId),
         after: this.after.bind(this, href, moduleId),
         saveState: this.saveState.bind(this)

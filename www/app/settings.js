@@ -59,7 +59,7 @@ define(function (require) {
       content: 'url',
       ok: true,
       cancel: true,
-      okHref: '!fn-back:addFeed?url=' + encodeURIComponent(url)
+      okHref: '#!fn-back:addFeed?url=' + encodeURIComponent(url)
     });
   };
 
