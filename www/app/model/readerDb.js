@@ -62,11 +62,23 @@ define(function (require) {
     // Set up the feedsDb
     feedsDb = new IDB(dbName, version, 'feeds');
     feedsDb.toFeedValue = function (feed) {
+      var publishedTime = 0;
+
+      // Find latest publishedTime to keep track of for new additions.
+      if (feed.entries) {
+        feed.entries.map(function (entry) {
+          if (entry.publishedTime > publishedTime) {
+            publishedTime = entry.publishedTime;
+          }
+        });
+      }
+
       return {
         feedUrl: feed.feedUrl,
         author: feed.author,
         title: feed.title,
-        description: feed.description
+        description: feed.description,
+        lastPublishedTime: publishedTime
       };
     };
   }).then(function () {
@@ -88,6 +100,52 @@ define(function (require) {
   });
 
   readerDb = {
+    updateFeed: function (url) {
+      var feed, feedRecord,
+          newTime = 0,
+          entries = [];
+
+      return whenDbUp.then(function () {
+        return googleApi.fetch(url);
+      }).then(function (f) {
+        feed = f;
+        return feedsDb.get(url);
+      }).then(function (record) {
+        if (!record) {
+          // New feed, just add it.
+          return feedsDb.add(feedsDb.toFeedValue(feed)).then(function () {
+            return entriesDb.addBulk(feed.entries);
+          });
+        } else {
+          feedRecord = record;
+
+          // Find any new feeds since feed.lastPublishedTime
+          var lastTime = feed.lastPublishedTime;
+
+          feed.entries.map(function (entry) {
+            if (entry.publishedTime > lastTime) {
+              entries.push(entry);
+              if (entry.publishedTime > newTime) {
+                newTime = entry.publishedTime;
+              }
+            }
+          });
+
+          if (entries.length) {
+            return entriesDb.addBulk(entries);
+          }
+        }
+      }).then(function () {
+        // If have a new last published time update feed info.
+        if (feedRecord && newTime) {
+          feedRecord.lastPublishedTime = newTime;
+          return feedsDb.put(feedRecord.feedUrl, feedRecord);
+        }
+      });
+    },
+
+    // AMD loader plugin method that allows using the 'readerDB![dbname]'
+    // syntax as a module dependency.
     load: function (id, require, load, config) {
       if (config.isBuild) {
         load();

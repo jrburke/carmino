@@ -4,7 +4,8 @@ define(function (require) {
   var searchValue, lastSearchPromise, searchTimeoutId,
     tmpl = require('tmpl!./settings.html'),
     resultsTmpl = require('tmpl!./settings-results.html'),
-    googleApi = require('./model/googleApi');
+    googleApi = require('./model/googleApi'),
+    readerDb = require('./model/readerDb');
 
   function clearSearchTimeout() {
     if (searchTimeoutId) {
@@ -66,7 +67,18 @@ define(function (require) {
   settings.addFeed = function (node, deck, data) {
     var url = data.url;
 
-    console.log(url);
+    return readerDb.updateFeed(url).then(function () {
+      // No need to do anything here, Deck will take care of nav given
+      // the okHref above.
+    }, function (err) {
+      deck.dialog({
+        title: 'Error fetching feed',
+        content: '<p>Could not fetch the feed at</p><p>' + url + '</p><p>' + err.toString(),
+        ok: 'OK'
+      });
+
+      return err;
+    });
   };
 
   settings.searchKeyPress = function (node, deck, data, evt) {
