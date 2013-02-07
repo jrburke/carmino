@@ -1,6 +1,7 @@
 /*global define, console */
-define(function (require) {
-  var tmpl = require('tmpl!./menu.html'),
+define(function (require, exports, module) {
+  var Deck = require('Deck'),
+      tmpl = require('tmpl!./menu.html'),
       feedsDb = require('./model/readerDb!feeds');
 
   function normalizeFeeds(feeds) {
@@ -12,7 +13,26 @@ define(function (require) {
     });
   }
 
-  function menu(deck, data) {
+  feedsDb.on('add', function (values) {
+    if (!Array.isArray(values)) {
+      values = [values];
+    }
+
+    // A bit inefficient, but add should only happen one add at a time,
+    // no bulk adds right now, so it works out, and this work is async anyway.
+    feedsDb.all().then(function (records) {
+      var html = tmpl({
+        feeds: normalizeFeeds(records)
+      });
+
+      Deck.updateCards(module.id, function (cardNode) {
+        cardNode.querySelector('.content')
+          .innerHTML = html;
+      });
+    });
+  });
+
+  function menu(deck) {
 
     feedsDb.all().then(function (records) {
       var feeds = normalizeFeeds(records);
@@ -34,7 +54,7 @@ define(function (require) {
   }
 
   menu.onShow = function (node, deck) {
-    console.log('menu onShow called: ', node);
+    console.log('menu onShow called: ', node, deck);
   };
 
   return menu;
