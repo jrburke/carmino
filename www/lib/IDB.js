@@ -232,7 +232,7 @@ define(['indexedDB!', 'prim', 'events'], function (api, prim, events) {
     add: function (value, key, storeName) {
       return this.tx('readwrite', function (store) {
         // branch on key existence because Chrome will throw up
-        // if you pass and undefined value to add.
+        // if you pass undefined value to add.
         // http://www.w3.org/TR/IndexedDB/#widl-IDBObjectStore-add-IDBRequest-any-value-any-key
         return prom(key ? store.add(value, key) : store.add(value));
       }, storeName).then(function (v) {
