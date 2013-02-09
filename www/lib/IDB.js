@@ -231,7 +231,10 @@ define(['indexedDB!', 'prim', 'events'], function (api, prim, events) {
 
     add: function (value, key, storeName) {
       return this.tx('readwrite', function (store) {
-        return prom(store.add(value, key));
+        // branch on key existence because Chrome will throw up
+        // if you pass and undefined value to add.
+        // http://www.w3.org/TR/IndexedDB/#widl-IDBObjectStore-add-IDBRequest-any-value-any-key
+        return prom(key ? store.add(value, key) : store.add(value));
       }, storeName).then(function (v) {
         this.emit('add', value, key, storeName);
         return v;
@@ -288,7 +291,12 @@ define(['indexedDB!', 'prim', 'events'], function (api, prim, events) {
 
     count: function (key, storeName) {
       return this.tx('readonly', function (store) {
-        return prom(key ? store.count() : store.count(key));
+        // MAKE SURE to pass an arg to count, but do not use undefined,
+        // otherwise Chrome 24 will blow up even though the arg is optional
+        // in the spec:
+        // http://www.w3.org/TR/IndexedDB/#widl-IDBObjectStore-count-IDBRequest-any-key
+        // Not passing any value (count()) also kills Chrome.
+        return prom(store.count(key || null));
       }, storeName);
     },
 
@@ -353,13 +361,3 @@ define(['indexedDB!', 'prim', 'events'], function (api, prim, events) {
 
   return IDB;
 });
-
-
-
-
-
-
-
-
-
-
